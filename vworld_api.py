@@ -18,9 +18,14 @@ class VWorldClient:
         self.search_url = "https://api.vworld.kr/req/search"
         self.data_url = "https://api.vworld.kr/req/data"
 
+    def _get_headers(self) -> Dict[str, str]:
+        return {"Referer": f"https://{self.domain}"}
+
     def geocode(self, address: str) -> Dict[str, Any]:
         """주소를 지오코딩하여 좌표, PNU, 정제주소, 행정구역 체계를 반환"""
         address = address.strip()
+        headers = self._get_headers()
+        
         # 1차 시도: PARCEL (지번)
         params = {
             "service": "address",
@@ -35,7 +40,7 @@ class VWorldClient:
             "key": self.api_key
         }
         try:
-            resp = requests.get(self.geocode_url, params=params, timeout=8)
+            resp = requests.get(self.geocode_url, params=params, headers=headers, timeout=8)
             data = resp.json()
             if data.get("response", {}).get("status") == "OK":
                 return self._parse_geocode_result(data, address)
@@ -45,7 +50,7 @@ class VWorldClient:
         # 2차 시도: ROAD (도로명)
         params["type"] = "ROAD"
         try:
-            resp = requests.get(self.geocode_url, params=params, timeout=8)
+            resp = requests.get(self.geocode_url, params=params, headers=headers, timeout=8)
             data = resp.json()
             if data.get("response", {}).get("status") == "OK":
                 return self._parse_geocode_result(data, address)
@@ -86,6 +91,7 @@ class VWorldClient:
         }
 
     def _search_fallback(self, query: str) -> Dict[str, Any]:
+        headers = self._get_headers()
         params = {
             "service": "search",
             "request": "search",
@@ -100,7 +106,7 @@ class VWorldClient:
             "key": self.api_key
         }
         try:
-            resp = requests.get(self.search_url, params=params, timeout=8)
+            resp = requests.get(self.search_url, params=params, headers=headers, timeout=8)
             data = resp.json()
             if data.get("response", {}).get("status") == "OK":
                 items = data.get("response", {}).get("result", {}).get("items", [])
@@ -201,6 +207,7 @@ class VWorldClient:
             return {"has_cadastral": False}
 
         url = "http://api.vworld.kr/ned/data/getLandCharacteristics"
+        headers = self._get_headers()
         params = {
             "key": self.api_key,
             "domain": self.domain,
@@ -209,7 +216,7 @@ class VWorldClient:
             "numOfRows": 1
         }
         try:
-            resp = requests.get(url, params=params, timeout=6)
+            resp = requests.get(url, params=params, headers=headers, timeout=6)
             data = resp.json()
             fields = data.get("landCharacteristicss", {}).get("field", [])
             if fields:
@@ -239,6 +246,7 @@ class VWorldClient:
         return {"has_cadastral": False}
 
     def _query_feature(self, layer: str, geom_filter: str) -> Optional[List[Dict[str, Any]]]:
+        headers = self._get_headers()
         params = {
             "service": "data",
             "request": "GetFeature",
@@ -251,10 +259,11 @@ class VWorldClient:
             "format": "json"
         }
         try:
-            resp = requests.get(self.data_url, params=params, timeout=6)
+            resp = requests.get(self.data_url, params=params, headers=headers, timeout=6)
             data = resp.json()
             if data.get("response", {}).get("status") == "OK":
                 return data.get("response", {}).get("result", {}).get("featureCollection", {}).get("features", [])
         except Exception:
             pass
         return None
+    
