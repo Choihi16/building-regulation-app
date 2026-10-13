@@ -252,7 +252,7 @@ with st.sidebar:
     
     site_area_sqm = st.number_input(
         "검토 대지 면적 (㎡)",
-        min_value=50.0,
+        min_value=0.0,
         max_value=500000.0,
         value=float(st.session_state["site_area_sqm_val"]),
         step=50.0,
