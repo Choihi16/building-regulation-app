@@ -641,50 +641,36 @@ st.markdown("""
 
 # 빠른 프리셋 버튼
 col_p1, col_p2, col_p3, col_p4 = st.columns(4)
-
-def execute_preset(addr: str, sqm: float, pnu_code: str):
-    st.session_state["target_addr"] = addr
-    st.session_state["site_area_sqm_val"] = sqm
-    st.session_state["cadastral_info"] = vworld.get_official_cadastral_info(pnu_code)
-    
-    # 실시간 API 연동으로 해당 대지의 용도지역 및 조례 강제 갱신
-    site_info = vworld.geocode(addr)
-    if site_info.get("success"):
-        x, y = site_info["x"], site_info["y"]
-        land_info = vworld.get_land_use_and_restrictions(x, y)
-        sido, sigg = site_info.get("sido", ""), site_info.get("sigg", "")
-        ordin_bundle = moleg.get_municipal_ordinance_bundle(sido, sigg)
-        
-        # 엔진 분석 결과를 세션에 즉시 저장하여 카드와 탭에 반영
-        analysis = engine.analyze(
-            site_info=site_info,
-            land_info=land_info,
-            ordin_bundle=ordin_bundle,
-            site_area=sqm,
-            planned_usage=planned_usage,
-            unit_count=unit_count,
-            unit_area=unit_area,
-            cadastral_info=st.session_state["cadastral_info"],
-            override_far=custom_far,
-            override_bcr=custom_bcr
-        )
-        st.session_state["exec_analysis"] = analysis
-        st.session_state["exec_bundle"] = ordin_bundle
-        st.session_state["exec_site"] = site_info
-        st.session_state["exec_land"] = land_info
-    st.rerun()
-
 if col_p1.button("📍 인천 신흥동3가 7-236", use_container_width=True):
-    execute_preset("인천광역시 제물포구 신흥동3가 7-236", 13236.0, "2811013000100070236")
+        st.session_state["target_addr"] = "인천광역시 제물포구 신흥동3가 7-236"
+        
+        # 1. 토지대장 기본 정보(지목 등)를 가져옵니다.
+        st.session_state["site_area_sqm_val"] = 13236.0
+        cad_info = vworld.get_official_cadastral_info("2811013000100070236")
+        st.session_state["cadastral_info"] = cad_info
+        
+        st.rerun()
 
 if col_p2.button("📍 천안 불당동 1479-1", use_container_width=True):
-    execute_preset("충청남도 천안시 서북구 불당동 1479-1", 8556.7, "4413311700114790001")
+    st.session_state["target_addr"] = "충청남도 천안시 서북구 불당동 1479-1"
+
+    st.session_state["site_area_sqm_val"] = 8556.7
+    cad_info = vworld.get_official_cadastral_info("4413311700114790001")
+    st.session_state["cadastral_info"] = cad_info
+    
+    st.rerun()
 
 if col_p3.button("📍 인천 남동구 구월동 1456", use_container_width=True, help="일반상업지역: 국토계획법 1300% vs 인천조례 700% 이중 검토"):
-    execute_preset("인천시 남동구 구월동 1456", 2854.0, "2820010100114560000")
+    st.session_state["target_addr"] = "인천시 남동구 구월동 1456"
+    st.session_state["site_area_sqm_val"] = 2854.0
+    st.session_state["cadastral_info"] = vworld.get_official_cadastral_info("2820010100114560000")
+    st.rerun()
 
 if col_p4.button("📍 부산 해운대구 우동 1408", use_container_width=True):
-    execute_preset("부산광역시 해운대구 우동 1408", 36918.8, "2635010500114080000")
+    st.session_state["target_addr"] = "부산광역시 해운대구 우동 1408"
+    st.session_state["site_area_sqm_val"] = 36918.8
+    st.session_state["cadastral_info"] = vworld.get_official_cadastral_info("2635010500114080000")
+    st.rerun()
 
 # 주소 입력창 및 면적 자동 조회 기능
 default_addr = st.session_state.get("target_addr", "서울시 성북구 길음동 1284")
