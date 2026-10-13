@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Optional
 VWORLD_KEY = "9FF03DCA-70F5-41A0-AC8B-0EB520A612B0"
 
 class VWorldClient:
-    def __init__(self, api_key: str = VWORLD_KEY, domain: str = "localhost"):
+    def __init__(self, api_key: str = VWORLD_KEY, domain: str = "building-regulation-app-9dnaemnx8tpuappyoc6c28.streamlit.app"):
         self.api_key = api_key
         self.domain = domain
         self.geocode_url = "https://api.vworld.kr/req/address"
