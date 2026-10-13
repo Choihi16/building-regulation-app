@@ -646,22 +646,19 @@ if col_p1.button("📍 인천 신흥동3가 7-236", use_container_width=True):
         st.session_state["target_addr"] = "인천광역시 제물포구 신흥동3가 7-236"
         
         # 1. 토지대장 기본 정보(지목 등)를 가져옵니다.
+        st.session_state["site_area_sqm_val"] = 13236.0
         cad_info = vworld.get_official_cadastral_info("2811013000100070236")
         st.session_state["cadastral_info"] = cad_info
-        
-        # 2. 토지이음 기준 진짜 대지면적을 강제로 세팅합니다. (방해되는 기존 if 코드는 삭제)
-        st.session_state["site_area_sqm_val"] = 13236.0
         
         st.rerun()
 
 if col_p2.button("📍 천안 불당동 1479-1", use_container_width=True):
     st.session_state["target_addr"] = "충청남도 천안시 서북구 불당동 1479-1"
-    
+
+    st.session_state["site_area_sqm_val"] = 8556.7
     cad_info = vworld.get_official_cadastral_info("4413311700114790001")
     st.session_state["cadastral_info"] = cad_info
     
-    st.session_state["site_area_sqm_val"] = 8556.7
-        
     st.rerun()
 
 if col_p3.button("📍 인천 남동구 구월동 1456", use_container_width=True, help="일반상업지역: 국토계획법 1300% vs 인천조례 700% 이중 검토"):
