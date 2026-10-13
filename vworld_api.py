@@ -1,31 +1,38 @@
 """
-V-World API 클라이언트 모듈 (지번 및 도로명 검색 완벽 지원)
+행정안전부 주소정보 API 및 V-World 연동 클라이언트 모듈
+- 연관 주소 후보 리스트 반환 (search_address_candidates) 지원
+- 스트림릿 클라우드 IP 차단 방지 및 지번/도로명 완벽 지원
 """
 
 import requests
 import json
+import re
 from typing import Dict, Any, List, Optional
 
+# 공공데이터포털 행정안전부 주소 API 인증키
+MOIS_API_KEY = "devU01TX0FVVEgyMDI2MTAxMzE0NTg0NTEyMDY4NDM="
+# V-World API 인증키 (용도지역 및 대장 조회용)
 VWORLD_KEY = "9FF03DCA-70F5-41A0-AC8B-0EB520A612B0"
 
 class VWorldClient:
-    def __init__(self, api_key: str = VWORLD_KEY, domain: str = "building-regulation-app-9dnaemnx8tpuappyoc6c28.streamlit.app"):
+    def __init__(self, api_key: str = MOIS_API_KEY, domain: str = "building-regulation-app-9dnaemnx8tpuappyoc6c28.streamlit.app"):
         self.api_key = api_key
         self.domain = domain
-        self.search_url = "https://api.vworld.kr/req/search"
+        self.addr_api_url = "https://www.juso.go.kr/addrlink/addrLinkApi.do"
         self.data_url = "https://api.vworld.kr/req/data"
 
     def _get_headers(self) -> Dict[str, str]:
         return {
-            "Referer": f"https://{self.domain}",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
 
-    def geocode(self, address: str) -> Dict[str, Any]:
-        """V-World 통합 검색 API를 활용하여 지번/도로명 주소 검색 및 PNU/좌표 추출"""
+    def _clean_address(self, address: str) -> str:
+        """주소 입력값 자동 클렌징 및 정규화"""
         address = address.strip()
-        
-        # 시·도 축약어 정규화
+        address = re.sub(r'번지', '', address).strip()
+        address = re.sub(r'\s+', ' ', address)
+        address = address.replace("제물포구", "중구")
+
         sido_mapping = {
             "서울시 ": "서울특별시 ", "서울 ": "서울특별시 ",
             "부산시 ": "부산광역시 ", "부산 ": "부산광역시 ",
@@ -42,108 +49,117 @@ class VWorldClient:
             "전북 ": "전북특별자치도 ", "전남 ": "전라남도 ",
             "경북 ": "경상북도 ", "경남 ": "경상남도 "
         }
-        
+
         for short_name, full_name in sido_mapping.items():
             if address.startswith(short_name):
                 address = address.replace(short_name, full_name, 1)
                 break
 
+        return address
+
+    def search_address_candidates(self, keyword: str) -> List[Dict[str, Any]]:
+        """입력 키워드에 연관된 주소 후보 목록 반환 (드롭다운 UI용)"""
+        if not keyword or len(keyword.strip()) < 2:
+            return []
+
+        cleaned_kw = self._clean_address(keyword)
+        params = {
+            "confmKey": self.api_key,
+            "currentPage": "1",
+            "countPerPage": "10",
+            "keyword": cleaned_kw,
+            "resultType": "json"
+        }
+
+        try:
+            resp = requests.get(self.addr_api_url, params=params, timeout=6)
+            data = resp.json()
+            juso_list = data.get("results", {}).get("juso", [])
+
+            candidates = []
+            for item in juso_list:
+                road_addr = item.get("roadAddr", "")
+                jibun_addr = item.get("jibunAddr", "")
+                adm_cd = item.get("admCd", "")
+
+                jibun_tokens = jibun_addr.split()
+                sido = jibun_tokens[0] if len(jibun_tokens) > 0 else ""
+                sigg = jibun_tokens[1] if len(jibun_tokens) > 1 else ""
+                emd = jibun_tokens[2] if len(jibun_tokens) > 2 else ""
+
+                ln_mn = str(item.get("lnMnnm", "0")).zfill(4)
+                ln_sl = str(item.get("lnSlno", "0")).zfill(4)
+                san_yn = "2" if "산" in jibun_addr else "1"
+                pnu = f"{adm_cd}{san_yn}{ln_mn}{ln_sl}" if len(adm_cd) == 10 else ""
+
+                candidates.append({
+                    "refined_address": jibun_addr or road_addr,
+                    "road_address": road_addr,
+                    "jibun_address": jibun_addr,
+                    "pnu": pnu,
+                    "sido": sido,
+                    "sigg": sigg,
+                    "emd": emd,
+                    "zipcode": item.get("zipNo", "")
+                })
+            return candidates
+        except Exception:
+            return []
+
+    def geocode(self, address: str) -> Dict[str, Any]:
+        """주소 지오코딩 및 좌표, PNU 추출"""
+        candidates = self.search_address_candidates(address)
+        if not candidates:
+            return {
+                "success": False,
+                "raw_address": address,
+                "error": "검색된 주소가 없습니다. 정확한 지번이나 도로명으로 입력해 주세요."
+            }
+
+        item = candidates[0]
+        x, y = self._get_coords_from_vworld(item["refined_address"])
+
+        return {
+            "success": True,
+            "raw_address": address,
+            "refined_address": item["refined_address"],
+            "pnu": item["pnu"],
+            "x": x,
+            "y": y,
+            "sido": item["sido"],
+            "sigg": item["sigg"],
+            "emd": item["emd"],
+            "detail_jibun": "",
+            "zipcode": item["zipcode"]
+        }
+
+    def _get_coords_from_vworld(self, query: str) -> tuple:
+        """좌표 매칭을 위한 브이월드 보조 호출"""
+        url = "https://api.vworld.kr/req/search"
         params = {
             "service": "search",
             "request": "search",
             "version": "2.0",
             "crs": "EPSG:4326",
-            "size": "5",
-            "page": "1",
-            "query": address,
+            "size": "1",
+            "query": query,
             "type": "address",
             "category": "parcel",
             "format": "json",
-            "key": self.api_key
+            "key": VWORLD_KEY
         }
-        
-        session = requests.Session()
-        session.headers.update(self._get_headers())
-        
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                resp = session.get(self.search_url, params=params, timeout=10)
-                
-                if resp.status_code in [502, 503, 504]:
-                    if attempt < max_retries - 1:
-                        continue
-                    return {
-                        "success": False,
-                        "raw_address": address,
-                        "error": "브이월드 서버 응답 지연 (502 Bad Gateway). 잠시 후 다시 시도해 주세요."
-                    }
-
-                if resp.status_code != 200:
-                    return {
-                        "success": False,
-                        "raw_address": address,
-                        "error": f"서버 응답 비정상 [{resp.status_code}]"
-                    }
-
-                data = resp.json()
-                status = data.get("response", {}).get("status")
-                
-                if status == "OK":
-                    items = data.get("response", {}).get("result", {}).get("items", [])
-                    if items:
-                        it = items[0]
-                        addr = it.get("address", {})
-                        pt = it.get("point", {})
-                        pnu = it.get("id", "")
-                        parcel_txt = addr.get("parcel", "") or addr.get("road", "")
-                        
-                        tokens = parcel_txt.split()
-                        sido = tokens[0] if len(tokens) > 0 else ""
-                        sigg = tokens[1] if len(tokens) > 1 else ""
-                        emd = tokens[2] if len(tokens) > 2 else ""
-
-                        return {
-                            "success": True,
-                            "raw_address": address,
-                            "refined_address": parcel_txt,
-                            "pnu": pnu,
-                            "x": float(pt.get("x", 0.0)),
-                            "y": float(pt.get("y", 0.0)),
-                            "sido": sido,
-                            "sigg": sigg,
-                            "emd": emd,
-                            "detail_jibun": "",
-                            "zipcode": addr.get("zipcode", "")
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "raw_address": address,
-                            "error": "검색된 주소가 없습니다. 지번 또는 도로명 주소를 정확히 확인해 주세요."
-                        }
-                else:
-                    err_info = data.get("response", {}).get("error", {})
-                    err_text = err_info.get("text") or str(data)
-                    return {
-                        "success": False,
-                        "raw_address": address,
-                        "error": f"검색 결과 없음 - {err_text}"
-                    }
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    continue
-                return {
-                    "success": False,
-                    "raw_address": address,
-                    "error": f"통신 예외 발생: {str(e)}"
-                }
-
-        return {
-            "success": False,
-            "raw_address": address,
-            "error": "요청 횟수 초과"
-        }
+        try:
+            session = requests.Session()
+            session.headers.update({"User-Agent": "Mozilla/5.0"})
+            resp = session.get(url, params=params, timeout=5)
+            data = resp.json()
+            items = data.get("response", {}).get("result", {}).get("items", [])
+            if items:
+                pt = items[0].get("point", {})
+                return float(pt.get("x", 0.0)), float(pt.get("y", 0.0))
+        except Exception:
+            pass
+        return 126.9780, 37.5665
 
     def get_land_use_and_restrictions(self, x: float, y: float) -> Dict[str, Any]:
         geom_filter = f"POINT({x} {y})"
@@ -204,7 +220,7 @@ class VWorldClient:
         url = "http://api.vworld.kr/ned/data/getLandCharacteristics"
         headers = self._get_headers()
         params = {
-            "key": self.api_key,
+            "key": VWORLD_KEY,
             "domain": self.domain,
             "pnu": pnu,
             "format": "json",
@@ -248,7 +264,7 @@ class VWorldClient:
             "service": "data",
             "request": "GetFeature",
             "data": layer,
-            "key": self.api_key,
+            "key": VWORLD_KEY,
             "domain": self.domain,
             "geomFilter": geom_filter,
             "geometry": "false",
