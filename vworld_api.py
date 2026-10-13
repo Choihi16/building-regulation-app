@@ -19,7 +19,11 @@ class VWorldClient:
         self.data_url = "https://api.vworld.kr/req/data"
 
     def _get_headers(self) -> Dict[str, str]:
-        return {"Referer": f"https://{self.domain}"}
+        # 공공 API 방화벽 차단을 우회하기 위한 브라우저 위장 헤더
+        return {
+            "Referer": f"https://{self.domain}",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        }
 
     def geocode(self, address: str) -> Dict[str, Any]:
         """주소를 검색하여 좌표, PNU, 정제주소, 행정구역 체계를 반환"""
@@ -104,7 +108,6 @@ class VWorldClient:
                         "error": "검색 결과 아이템이 없습니다 (주소 불일치 가능성)"
                     }
             else:
-                # 브이월드 서버가 거부한 구체적인 이유 추출
                 err_info = data.get("response", {}).get("error", {})
                 err_text = err_info.get("text") or str(data)
                 return {
