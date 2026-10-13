@@ -642,16 +642,32 @@ st.markdown("""
 
 # 빠른 프리셋 버튼
 col_p1, col_p2, col_p3, col_p4 = st.columns(4)
-if col_p1.button("📍 서울 성북구 길음동 1284", use_container_width=True):
-    st.session_state["target_addr"] = "서울시 성북구 길음동 1284"
-    st.session_state["site_area_sqm_val"] = 46111.5
-    st.session_state["cadastral_info"] = vworld.get_official_cadastral_info("1129013400112840000")
+if col_p1.button("📍 인천 신흥동3가 7-236", use_container_width=True):
+    st.session_state["target_addr"] = "인천광역시 제물포구 신흥동3가 7-236"
+    
+    # 1. PNU 코드로 토지대장 정보를 먼저 불러옵니다.
+    cad_info = vworld.get_official_cadastral_info("2811013000100070236")
+    st.session_state["cadastral_info"] = cad_info
+    
+    # 2. 불러온 정보 안에 면적(official_area_sqm)이 있다면 자동으로 대지면적에 쏙 넣습니다.
+    if cad_info and "official_area_sqm" in cad_info:
+        st.session_state["site_area_sqm_val"] = float(cad_info["official_area_sqm"])
+    else:
+        st.session_state["site_area_sqm_val"] = 0.0 # 정보를 못 찾았을 때만 0으로 처리
+        
     st.rerun()
 
-if col_p2.button("📍 성남 분당구 정자동 178-1", use_container_width=True):
-    st.session_state["target_addr"] = "경기도 성남시 분당구 정자동 178-1"
-    st.session_state["site_area_sqm_val"] = 6600.0
-    st.session_state["cadastral_info"] = vworld.get_official_cadastral_info("4113510300101780001")
+if col_p2.button("📍 천안 불당동 1479-1", use_container_width=True):
+    st.session_state["target_addr"] = "충청남도 천안시 서북구 불당동 1479-1"
+    
+    cad_info = vworld.get_official_cadastral_info("4413311700114790001")
+    st.session_state["cadastral_info"] = cad_info
+    
+    if cad_info and "official_area_sqm" in cad_info:
+        st.session_state["site_area_sqm_val"] = float(cad_info["official_area_sqm"])
+    else:
+        st.session_state["site_area_sqm_val"] = 0.0
+        
     st.rerun()
 
 if col_p3.button("📍 인천 남동구 구월동 1456", use_container_width=True, help="일반상업지역: 국토계획법 1300% vs 인천조례 700% 이중 검토"):
@@ -666,13 +682,49 @@ if col_p4.button("📍 부산 해운대구 우동 1408", use_container_width=Tru
     st.session_state["cadastral_info"] = vworld.get_official_cadastral_info("2635010500114080000")
     st.rerun()
 
-# 주소 입력창
+# 주소 입력창 및 면적 자동 조회 기능
 default_addr = st.session_state.get("target_addr", "서울시 성북구 길음동 1284")
-addr_input = st.text_input(
-    "검토 대상 대지 위치 (도로명 또는 지번 주소)",
-    value=default_addr,
-    placeholder="예: 서울시 성북구 길음동 1284 또는 강남대로 390"
-)
+
+col_addr, col_btn = st.columns([3, 1])
+with col_addr:
+    addr_input = st.text_input(
+        "검토 대상 대지 위치 (도로명 또는 지번 주소)",
+        value=default_addr,
+        placeholder="예: 서울시 성북구 길음동 1284 또는 강남대로 390",
+        label_visibility="collapsed"
+    )
+with col_btn:
+    if st.button("🔍 주소로 면적 자동 조회", use_container_width=True):
+        if addr_input:
+            st.session_state["target_addr"] = addr_input
+            try:
+                # 1. 주소로 PNU 코드를 찾습니다.
+                pnu_code = vworld.get_pnu_from_address(addr_input)
+                
+                if pnu_code:
+                    # 2. PNU 코드로 토지대장 정보를 가져옵니다.
+                    cadastral_info = vworld.get_official_cadastral_info(pnu_code)
+                    
+                    if cadastral_info and cadastral_info.get("has_cadastral"):
+                        # 3. 면적 정보를 세션 상태에 저장합니다.
+                        st.session_state["site_area_sqm_val"] = cadastral_info.get("official_area_sqm", 0.0)
+                        st.session_state["cadastral_info"] = cadastral_info
+                        st.success(f"면적({st.session_state['site_area_sqm_val']}㎡)을 성공적으로 불러왔습니다.")
+                        st.rerun() # 화면을 새로고침하여 좌측 사이드바에 면적을 즉시 반영합니다.
+                    else:
+                        st.warning("해당 주소의 토지대장 정보를 찾을 수 없습니다.")
+                else:
+                    st.warning("해당 주소의 고유번호(PNU)를 찾을 수 없습니다. 주소를 다시 확인해주세요.")
+            except Exception as e:
+                st.error("면적 데이터를 불러오는 중 오류가 발생했습니다.")
+        else:
+            st.warning("주소를 입력해주세요.")
+
+# 상태 업데이트 (버튼을 누르지 않고 주소만 타이핑했을 때를 대비)
+if addr_input != st.session_state.get("target_addr"):
+    st.session_state["target_addr"] = addr_input
+
+st.write("<div style='height:15px;'></div>", unsafe_allow_html=True) # 여백 추가
 
 btn_col, _ = st.columns([1.3, 3.7])
 trigger_analysis = btn_col.button("🚀 통합 법규 및 사업성 정밀 검토 실행", type="primary", use_container_width=True)
@@ -1088,26 +1140,62 @@ if trigger_analysis or "exec_analysis" in st.session_state:
         st.caption(f"ℹ️ **산정 세부 근거**: {parking_info['basis']} (장애인 전용 주차구획 {parking_info['accessibility_count']}대 별도)")
 
     # ---------------------------------------------------------
-    # 탭 3. 4대 주요 심의 판정 및 절차
+    # 탭 3. 8대 주요 심의 및 평가 자동 판정 (O/X) 및 리스크 매트릭스
     # ---------------------------------------------------------
     with t3:
-        st.markdown('<div class="section-title">🛡️ 4대 주요 심의 자동 판정 (O/X) 및 리스크 매트릭스</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">🛡️ 8대 주요 심의 및 영향평가 자동 판정 (O/X)</div>', unsafe_allow_html=True)
+        st.caption("대지면적 및 실무 기준을 바탕으로 추정한 결과입니다. (실제 토지이용계획확인원 확인 필수)")
 
-        # 심의 테이블 표시 (HTML 렌더링으로 컬러 태그 적용)
+        # 기존 4대 심의 테이블 표시 (HTML 렌더링으로 컬러 태그 적용)
         delib_rows = []
         for d in delibs["items"]:
             tag_class = "tag-red" if d["tag"] == "규제" else ("tag-yellow" if d["tag"] == "주의" else "tag-green")
             delib_rows.append({
-                "심의 명칭": d["name"],
+                "심의/평가 명칭": d["name"],
                 "대상 여부": d["required"],
                 "리스크 등급": f"<span class='{tag_class}'>{d['tag']}</span>",
                 "예상 소요기간": d["timeline"],
-                "심의 주관기관": d["authority"],
+                "주관기관": d["authority"],
                 "필수 체크포인트": d["checkpoints"]
             })
-
+        
         df_delib = pd.DataFrame(delib_rows)
         st.write(df_delib.to_html(escape=False, index=False), unsafe_allow_html=True)
+
+        st.write("")
+        st.markdown('<div class="section-title">🌍 4대 영향평가 (환경/교육/지하/문화재) 추가 진단</div>', unsafe_allow_html=True)
+        
+        # 현재 면적 및 세대수 가져오기
+        current_area = float(st.session_state.get("site_area_sqm_val", 0.0))
+        current_units = feas.get("effective_unit_count", 0)
+
+        col_sim1, col_sim2 = st.columns(2)
+
+        with col_sim1:
+            # 1. 환경영향평가
+            st.markdown("#### 1️⃣ 환경영향평가 (소규모 포함)")
+            if current_area >= 100000:
+                st.error(f"🚨 대지면적 {current_area:,.0f}㎡: **환경영향평가 대상** 가능성이 매우 높습니다 (통상 10만㎡ 이상). 심의 기간을 길게 잡아야 합니다.")
+            elif current_area >= 5000:
+                st.warning(f"⚠️ 대지면적 {current_area:,.0f}㎡: 용도지역(보전관리지역 등)에 따라 **소규모 환경영향평가** 대상일 수 있습니다.")
+            else:
+                st.success(f"✅ 대지면적 {current_area:,.0f}㎡: 일반적인 환경영향평가 면적 기준(5,000㎡) 미만으로 대상이 아닐 확률이 높습니다.")
+
+            # 2. 교육환경평가
+            st.markdown("#### 2️⃣ 교육환경평가")
+            if current_area >= 100000 or (isinstance(current_units, int) and current_units >= 1000):
+                 st.error(f"🚨 대규모(연면적 10만㎡ 또는 21층 이상) 건축물이거나 반경 200m 내 학교가 있을 경우 **필수 대상**입니다. 관할 교육청 확인이 시급합니다.")
+            else:
+                 st.info("💡 사업지 반경 200m 이내에 학교(예정지 포함)가 있어 **'교육환경보호구역'**에 속할 경우 심의 대상입니다. (토지이용계획확인원 확인 필요)")
+
+        with col_sim2:
+            # 3. 지하안전평가
+            st.markdown("#### 3️⃣ 지하안전평가")
+            st.warning("⚠️ **굴착 깊이에 따른 평가 기준 (건축도면 확인 필수)**\n- **10m 이상 20m 미만** (약 지하 3~5층): 소규모 지하안전평가\n- **20m 이상** (약 지하 6층 이상): 지하안전평가 필수")
+
+            # 4. 문화재 보존영향 검토
+            st.markdown("#### 4️⃣ 문화재 보존영향 검토")
+            st.info("💡 사업지가 **'역사문화환경 보존지역'** (일반적으로 지정문화재 경계로부터 반경 500m 이내)에 포함될 경우, 지자체 문화재 위원회의 층수 및 디자인 심의를 통과해야 합니다.")
 
         st.write("")
         st.markdown('<div class="section-title">🚒 피난 / 방화 / 소방 안전 필수 특이사항 매뉴얼</div>', unsafe_allow_html=True)
