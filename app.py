@@ -643,19 +643,16 @@ st.markdown("""
 # 빠른 프리셋 버튼
 col_p1, col_p2, col_p3, col_p4 = st.columns(4)
 if col_p1.button("📍 인천 신흥동3가 7-236", use_container_width=True):
-    st.session_state["target_addr"] = "인천광역시 제물포구 신흥동3가 7-236"
-    
-    # 1. PNU 코드로 토지대장 정보를 먼저 불러옵니다.
-    cad_info = vworld.get_official_cadastral_info("2811013000100070236")
-    st.session_state["cadastral_info"] = cad_info
-    
-    # 2. 불러온 정보 안에 면적(official_area_sqm)이 있다면 자동으로 대지면적에 쏙 넣습니다.
-    if cad_info and "official_area_sqm" in cad_info:
-        st.session_state["site_area_sqm_val"] = float(cad_info["official_area_sqm"])
-    else:
-        st.session_state["site_area_sqm_val"] = 0.0 # 정보를 못 찾았을 때만 0으로 처리
+        st.session_state["target_addr"] = "인천광역시 제물포구 신흥동3가 7-236"
         
-    st.rerun()
+        # 1. 토지대장 기본 정보(지목 등)를 가져옵니다.
+        cad_info = vworld.get_official_cadastral_info("2811013000100070236")
+        st.session_state["cadastral_info"] = cad_info
+        
+        # 2. 토지이음 기준 진짜 대지면적을 강제로 세팅합니다. (방해되는 기존 if 코드는 삭제)
+        st.session_state["site_area_sqm_val"] = 13236.0
+        
+        st.rerun()
 
 if col_p2.button("📍 천안 불당동 1479-1", use_container_width=True):
     st.session_state["target_addr"] = "충청남도 천안시 서북구 불당동 1479-1"
@@ -663,10 +660,7 @@ if col_p2.button("📍 천안 불당동 1479-1", use_container_width=True):
     cad_info = vworld.get_official_cadastral_info("4413311700114790001")
     st.session_state["cadastral_info"] = cad_info
     
-    if cad_info and "official_area_sqm" in cad_info:
-        st.session_state["site_area_sqm_val"] = float(cad_info["official_area_sqm"])
-    else:
-        st.session_state["site_area_sqm_val"] = 0.0
+    st.session_state["site_area_sqm_val"] = 8556.7
         
     st.rerun()
 
