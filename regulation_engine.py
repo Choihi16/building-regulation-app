@@ -371,10 +371,12 @@ class RegulationEngine:
             far_ordinance_val = db_match.get("far_ordinance_seoul", "200%")
             far_ordinance_num = float(db_match.get("far_num", 200.0))
         else:
-            bcr_ordinance_val = db_match.get("bcr_ordinance_seoul", "60%")
-            bcr_ordinance_num = float(db_match.get("bcr_num", 50.0))
-            far_ordinance_val = db_match.get("far_ordinance_seoul", "200%")
-            far_ordinance_num = float(db_match.get("far_num", 200.0))
+            # 전국 범용 처리: 서울/인천 외 지역은 국토계획법을 임시 기준으로 잡고, '조례 개별 확인' 경고 텍스트 표출
+            bcr_ordinance_num = float(db_match.get("bcr_national_num", 50.0))
+            far_ordinance_num = float(db_match.get("far_national_num", 200.0))
+            
+            bcr_ordinance_val = f"⚠️ {sido_label} 조례 개별 확인 (법정 상한 {bcr_ordinance_num}% 기준 산정)"
+            far_ordinance_val = f"⚠️ {sido_label} 조례 개별 확인 (법정 상한 {far_ordinance_num}% 기준 산정)"
 
         # 조례 본문에서 해당 용도지역 값 직접 파싱 시도
         parsed_bcr, num_bcr = self._extract_value_from_articles(ordin_bundle.get("bcr_articles", []), primary_zoning, "건폐율")
