@@ -685,31 +685,30 @@ with col_addr:
         label_visibility="collapsed"
     )
 with col_btn:
-    if st.button("🔍 주소로 면적 자동 조회", use_container_width=True):
-        if addr_input:
-            st.session_state["target_addr"] = addr_input
-            try:
-                # 1. 주소로 PNU 코드를 찾습니다.
-                pnu_code = vworld.get_pnu_from_address(addr_input)
+    if st.button("🔍 주소로 면적 자동 조회"):
+        try:
+            # 세션에 저장된 주소를 안전하게 가져옵니다.
+            target_addr = st.session_state.get("target_addr", "")
+            
+            # 지오코딩 및 PNU 추출 시도
+            geo_result = vworld.geocode(target_addr)
+            
+            if geo_result and geo_result.get("success") and geo_result.get("pnu"):
+                pnu = geo_result.get("pnu")
+                cad_info = vworld.get_official_cadastral_info(pnu)
                 
-                if pnu_code:
-                    # 2. PNU 코드로 토지대장 정보를 가져옵니다.
-                    cadastral_info = vworld.get_official_cadastral_info(pnu_code)
-                    
-                    if cadastral_info and cadastral_info.get("has_cadastral"):
-                        # 3. 면적 정보를 세션 상태에 저장합니다.
-                        st.session_state["site_area_sqm_val"] = cadastral_info.get("official_area_sqm", 0.0)
-                        st.session_state["cadastral_info"] = cadastral_info
-                        st.success(f"면적({st.session_state['site_area_sqm_val']}㎡)을 성공적으로 불러왔습니다.")
-                        st.rerun() # 화면을 새로고침하여 좌측 사이드바에 면적을 즉시 반영합니다.
-                    else:
-                        st.warning("해당 주소의 토지대장 정보를 찾을 수 없습니다.")
+                if cad_info and cad_info.get("has_cadastral") and cad_info.get("official_area_sqm", 0.0) > 0:
+                    st.session_state["site_area_sqm_val"] = float(cad_info["official_area_sqm"])
+                    st.success("대지면적 조회를 완료했습니다!")
+                    st.rerun()
                 else:
-                    st.warning("해당 주소의 고유번호(PNU)를 찾을 수 없습니다. 주소를 다시 확인해주세요.")
-            except Exception as e:
-                st.error("면적 데이터를 불러오는 중 오류가 발생했습니다.")
-        else:
-            st.warning("주소를 입력해주세요.")
+                    st.warning("⚠️ 토지대장에서 면적 정보를 찾지 못했습니다. 아래에서 면적을 직접 입력해 주세요.")
+            else:
+                st.warning("⚠️ 해당 주소의 토지 고유번호(PNU)를 특정할 수 없습니다. 정확한 지번 주소로 입력해 보세요.")
+                
+        except Exception as e:
+            # 💡 try문의 짝꿍인 except 구문을 추가하여 에러 방어
+            st.warning("⚠️ 면적 데이터를 조회하는 중 일시적인 오류가 발생했습니다. 직접 입력해 주세요.")
 
 # 상태 업데이트 (버튼을 누르지 않고 주소만 타이핑했을 때를 대비)
 if addr_input != st.session_state.get("target_addr"):
