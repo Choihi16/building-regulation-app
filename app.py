@@ -203,13 +203,26 @@ engine = RegulationEngine()
 # 세션 상태 초기값 설정
 # -------------------------------------------------------------
 if "target_addr" not in st.session_state:
-    st.session_state["target_addr"] = ""  # 👈 주소를 빈 칸으로 설정
+    st.session_state["target_addr"] = ""  # 주소 빈 칸으로 시작
 
 if "site_area_sqm_val" not in st.session_state:
-    st.session_state["site_area_sqm_val"] = 0.0  # 👈 면적을 0으로 설정
+    st.session_state["site_area_sqm_val"] = 0.0  # 면적 0으로 시작
 
 if "cadastral_info" not in st.session_state:
-    st.session_state["cadastral_info"] = {}  # 👈 초기 정보를 빈 딕셔너리로 설정
+    st.session_state["cadastral_info"] = {}  # 초기 정보 빈 딕셔너리
+
+# ⚠️ 이 부분이 빠져서 에러가 난 것이므로 반드시 포함해 주세요!
+if "apt_types" not in st.session_state:
+    st.session_state["apt_types"] = [
+        {"area": 59.0, "count": 80},
+        {"area": 84.0, "count": 120}
+    ]
+
+if "off_types" not in st.session_state:
+    st.session_state["off_types"] = [
+        {"area": 29.0, "count": 30},
+        {"area": 59.0, "count": 40}
+    ]
 
 # -------------------------------------------------------------
 # 사이드바: 기획설계 조건 및 검토 조건 입력
