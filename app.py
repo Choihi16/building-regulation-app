@@ -1,6 +1,6 @@
 """
 🏛️ AI 건축 법규 및 기획설계 사업성 통합 검토 웹 앱 (Streamlit)
-- 경영진 및 임원진 보고용 대시보드 UI
+- 보고용 대시보드 UI
 - 대지 주소 + 계획 용도 + 대지면적 입력 기반
 - 브이월드 API (PNU, 좌표, 용도지역, 토지대장 공부상 면적) + 법제처 Open API 연동
 - 상단 Executive Summary & 4대 핵심 지표 카드
@@ -32,7 +32,7 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------
-# 경영진 보고용 커스텀 CSS 스타일링
+# 보고용 커스텀 CSS 스타일링
 # -------------------------------------------------------------
 st.markdown("""
 <style>
@@ -231,7 +231,7 @@ if "off_types" not in st.session_state:
 with st.sidebar:
     st.image("https://img.icons8.com/isometric/100/building.png", width=65)
     st.markdown("### 📋 기획설계 조건 설정")
-    st.caption("실무 설계 및 경영진 보고용 계획 조건을 설정하세요.")
+    st.caption("실무 설계 및 보고용 계획 조건을 설정하세요.")
 
     # 1. 계획 용도
     planned_usage = st.selectbox(
@@ -760,7 +760,7 @@ if trigger_analysis or "exec_analysis" in st.session_state:
     if dp_alert["required"]:
         st.markdown(f"""
         <div class="warning-alert">
-            <h4 style="margin:0 0 6px 0; font-size:1.05rem; font-weight:800;">⚠️ [경영진 필독] {dp_alert['title']}</h4>
+            <h4 style="margin:0 0 6px 0; font-size:1.05rem; font-weight:800;">⚠️ [필독] {dp_alert['title']}</h4>
             <div style="font-size:0.92rem; line-height:1.6;">
                 {dp_alert['message']}
             </div>
@@ -816,7 +816,7 @@ if trigger_analysis or "exec_analysis" in st.session_state:
     # 3줄 요약 결론 박스
     st.markdown(f"""
     <div class="conclusion-box">
-        <h4>💡 경영진 보고용 3줄 핵심 결론 (Executive Summary)</h4>
+        <h4>💡 보고용 3줄 핵심 결론 (Executive Summary)</h4>
         <div class="conclusion-item">{three_lines[0]}</div>
         <div class="conclusion-item">{three_lines[1]}</div>
         <div class="conclusion-item">{three_lines[2]}</div>
@@ -824,7 +824,7 @@ if trigger_analysis or "exec_analysis" in st.session_state:
     """, unsafe_allow_html=True)
 
     # ---------------------------------------------------------
-    # 경영진 보고용 즉시 다운로드 Quick Action Bar
+    # 보고용 즉시 다운로드 Quick Action Bar
     # ---------------------------------------------------------
     file_base = site.get("refined_address", "site").replace(" ", "_")
     excel_bytes = generate_excel_report(analysis).getvalue()
@@ -833,7 +833,7 @@ if trigger_analysis or "exec_analysis" in st.session_state:
 
     st.markdown("""
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <span style="font-weight:700; color:#1E293B; font-size:0.95rem;">📥 경영진 보고용 파일 원클릭 다운로드:</span>
+        <span style="font-weight:700; color:#1E293B; font-size:0.95rem;">📥 보고용 파일 원클릭 다운로드:</span>
         <span style="font-size:0.8rem; color:#64748B;">엑셀(.xlsx) / 한글·워드(.docx) / 마크다운(.md)</span>
     </div>
     """, unsafe_allow_html=True)
@@ -1199,8 +1199,8 @@ if trigger_analysis or "exec_analysis" in st.session_state:
             st.markdown(f"- ☑️ **{title}**: {desc}")
 
         st.divider()
-        st.markdown('<div class="section-title">📥 경영진 보고용 통합 파일 즉시 다운로드</div>', unsafe_allow_html=True)
-        st.caption("실무 설계 및 경영진 의사결정 보고에 최적화된 3대 포맷(Excel, Word/HWP 호환 서식, Markdown)으로 내보내기를 지원합니다.")
+        st.markdown('<div class="section-title">📥 보고용 통합 파일 즉시 다운로드</div>', unsafe_allow_html=True)
+        st.caption("실무 설계 및 의사결정 보고에 최적화된 3대 포맷(Excel, Word/HWP 호환 서식, Markdown)으로 내보내기를 지원합니다.")
 
         col_dl1, col_dl2, col_dl3 = st.columns(3)
         with col_dl1:
