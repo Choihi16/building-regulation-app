@@ -1,9 +1,10 @@
 """
-V-World API 클라이언트 모듈 (디버그 모드)
+V-World API 클라이언트 모듈 (자동 재시도 로직 적용)
 """
 
 import requests
 import json
+import time
 from typing import Dict, Any, List, Optional
 
 VWORLD_KEY = "9FF03DCA-70F5-41A0-AC8B-0EB520A612B0"
@@ -72,73 +73,98 @@ class VWorldClient:
         session = requests.Session()
         session.headers.update(headers)
         
-        try:
-            resp = session.get(self.search_url, params=params, timeout=10)
-            
-            # 응답 상태 코드 및 내용 확인
-            if resp.status_code != 200:
-                return {
-                    "success": False,
-                    "raw_address": query,
-                    "error": f"서버 응답 코드 비정상 [{resp.status_code}]: {resp.text[:200]}"
-                }
-
+        max_retries = 3
+        for attempt in range(max_retries):
             try:
-                data = resp.json()
-            except json.JSONDecodeError:
-                return {
-                    "success": False,
-                    "raw_address": query,
-                    "error": f"브이월드 방화벽 차단(HTML 반환됨): {resp.text[:200]}"
-                }
+                resp = session.get(self.search_url, params=params, timeout=10)
+                
+                # 502 등 서버 에러 발생 시 잠시 대기 후 재시도
+                if resp.status_code in [502, 503, 504]:
+                    if attempt < max_retries - 1:
+                        time.sleep(1.5 * (attempt + 1))
+                        continue
+                    else:
+                        return {
+                            "success": False,
+                            "raw_address": query,
+                            "error": "브이월드 서버 점검 중이거나 응답이 없습니다. 잠시 후 다시 시도해 주세요. (502 Bad Gateway)"
+                        }
 
-            status = data.get("response", {}).get("status")
-            if status == "OK":
-                items = data.get("response", {}).get("result", {}).get("items", [])
-                if items:
-                    it = items[0]
-                    addr = it.get("address", {})
-                    pt = it.get("point", {})
-                    pnu = it.get("id", "")
-                    parcel_txt = addr.get("parcel", "")
-                    tokens = parcel_txt.split()
-                    sido = tokens[0] if len(tokens) > 0 else ""
-                    sigg = tokens[1] if len(tokens) > 1 else ""
-                    emd = tokens[2] if len(tokens) > 2 else ""
-
-                    return {
-                        "success": True,
-                        "raw_address": query,
-                        "refined_address": parcel_txt or addr.get("road", query),
-                        "pnu": pnu,
-                        "x": float(pt.get("x", 0.0)),
-                        "y": float(pt.get("y", 0.0)),
-                        "sido": sido,
-                        "sigg": sigg,
-                        "emd": emd,
-                        "detail_jibun": "",
-                        "zipcode": addr.get("zipcode", "")
-                    }
-                else:
+                if resp.status_code != 200:
                     return {
                         "success": False,
                         "raw_address": query,
-                        "error": "검색 결과 아이템이 없습니다."
+                        "error": f"서버 응답 비정상 [{resp.status_code}]"
                     }
-            else:
-                err_info = data.get("response", {}).get("error", {})
-                err_text = err_info.get("text") or str(data)
+
+                try:
+                    data = resp.json()
+                except json.JSONDecodeError:
+                    if attempt < max_retries - 1:
+                        time.sleep(1.5 * (attempt + 1))
+                        continue
+                    return {
+                        "success": False,
+                        "raw_address": query,
+                        "error": f"브이월드 방화벽/점검 페이지 수신됨: {resp.text[:100]}"
+                    }
+
+                status = data.get("response", {}).get("status")
+                if status == "OK":
+                    items = data.get("response", {}).get("result", {}).get("items", [])
+                    if items:
+                        it = items[0]
+                        addr = it.get("address", {})
+                        pt = it.get("point", {})
+                        pnu = it.get("id", "")
+                        parcel_txt = addr.get("parcel", "")
+                        tokens = parcel_txt.split()
+                        sido = tokens[0] if len(tokens) > 0 else ""
+                        sigg = tokens[1] if len(tokens) > 1 else ""
+                        emd = tokens[2] if len(tokens) > 2 else ""
+
+                        return {
+                            "success": True,
+                            "raw_address": query,
+                            "refined_address": parcel_txt or addr.get("road", query),
+                            "pnu": pnu,
+                            "x": float(pt.get("x", 0.0)),
+                            "y": float(pt.get("y", 0.0)),
+                            "sido": sido,
+                            "sigg": sigg,
+                            "emd": emd,
+                            "detail_jibun": "",
+                            "zipcode": addr.get("zipcode", "")
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "raw_address": query,
+                            "error": "검색 결과가 없습니다."
+                        }
+                else:
+                    err_info = data.get("response", {}).get("error", {})
+                    err_text = err_info.get("text") or str(data)
+                    return {
+                        "success": False,
+                        "raw_address": query,
+                        "error": f"V-World 거부 [Status: {status}] - {err_text}"
+                    }
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    time.sleep(1.5 * (attempt + 1))
+                    continue
                 return {
                     "success": False,
                     "raw_address": query,
-                    "error": f"V-World 거부 [Status: {status}] - {err_text}"
+                    "error": f"통신 예외 발생: {str(e)}"
                 }
-        except Exception as e:
-            return {
-                "success": False,
-                "raw_address": query,
-                "error": f"통신 예외 발생: {str(e)}"
-            }
+
+        return {
+            "success": False,
+            "raw_address": query,
+            "error": "요청 횟수 초과 또는 서버 연결 실패"
+        }
 
     def get_land_use_and_restrictions(self, x: float, y: float) -> Dict[str, Any]:
         geom_filter = f"POINT({x} {y})"
