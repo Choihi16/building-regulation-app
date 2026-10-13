@@ -25,7 +25,7 @@ class VWorldClient:
         """주소를 지오코딩하여 좌표, PNU, 정제주소, 행정구역 체계를 반환"""
         address = address.strip()
         
-        # 전국 시·도 축약어 자동 정규화 (브이월드 API 필수 요구사항)
+        # 전국 시·도 축약어 자동 정규화
         sido_mapping = {
             "서울시 ": "서울특별시 ", "서울 ": "서울특별시 ",
             "부산시 ": "부산광역시 ", "부산 ": "부산광역시 ",
@@ -49,7 +49,8 @@ class VWorldClient:
                 break
 
         headers = self._get_headers()
-        
+        last_error = ""
+
         # 1차 시도: PARCEL (지번)
         params = {
             "service": "address",
@@ -67,23 +68,40 @@ class VWorldClient:
         try:
             resp = requests.get(self.geocode_url, params=params, headers=headers, timeout=8)
             data = resp.json()
-            if data.get("response", {}).get("status") == "OK":
+            status = data.get("response", {}).get("status")
+            if status == "OK":
                 return self._parse_geocode_result(data, address)
+            else:
+                err_msg = data.get("response", {}).get("error", {}).get("text", str(data))
+                last_error = f"PARCEL 실패: {status} ({err_msg})"
         except Exception as e:
-            pass
+            last_error = f"PARCEL 예외: {str(e)}"
 
         # 2차 시도: ROAD (도로명)
         params["type"] = "ROAD"
         try:
             resp = requests.get(self.geocode_url, params=params, headers=headers, timeout=8)
             data = resp.json()
-            if data.get("response", {}).get("status") == "OK":
+            status = data.get("response", {}).get("status")
+            if status == "OK":
                 return self._parse_geocode_result(data, address)
+            else:
+                err_msg = data.get("response", {}).get("error", {}).get("text", str(data))
+                last_error = f"ROAD 실패: {status} ({err_msg})"
         except Exception as e:
-            pass
+            last_error = f"ROAD 예외: {str(e)}"
 
         # 3차 시도: Search API 2.0
-        return self._search_fallback(address)
+        search_result = self._search_fallback(address)
+        if search_result.get("success"):
+            return search_result
+        
+        # 모든 시도 실패 시 상세 원인 반환
+        return {
+            "success": False,
+            "raw_address": address,
+            "error": f"주소 확인 실패 [{last_error}]"
+        }
 
     def _parse_geocode_result(self, data: Dict[str, Any], raw_addr: str) -> Dict[str, Any]:
         resp_data = data.get("response", {})
@@ -95,7 +113,6 @@ class VWorldClient:
         y = float(point.get("y", 0.0))
         pnu = structure.get("level4LC") or ""
 
-        # PNU가 지오코더에서 비어있으면 검색 API로 보완 시도
         if not pnu or len(pnu) < 19:
             search_res = self._search_fallback(refined.get("text", raw_addr))
             if search_res.get("pnu"):
@@ -160,20 +177,17 @@ class VWorldClient:
                         "detail_jibun": "",
                         "zipcode": addr.get("zipcode", "")
                     }
-        except Exception:
+        except Exception as e:
             pass
 
         return {
             "success": False,
             "raw_address": query,
-            "error": "주소를 찾을 수 없습니다. 도로명 또는 지번 주소를 확인해주세요."
+            "error": "검색 API fallback 실패"
         }
 
     def get_land_use_and_restrictions(self, x: float, y: float) -> Dict[str, Any]:
-        """좌표(WGS84 lon, lat)를 기준으로 용도지역 및 각종 규제/구역을 조회"""
         geom_filter = f"POINT({x} {y})"
-
-        # 1. 용도지역 (도시지역 우선, 관리/농림/자연환경보전 fallback)
         zoning_names = []
         for layer in ["LT_C_UQ111", "LT_C_UQ112", "LT_C_UQ113", "LT_C_UQ114"]:
             res = self._query_feature(layer, geom_filter)
@@ -185,7 +199,6 @@ class VWorldClient:
                 if zoning_names:
                     break
 
-        # 2. 지구단위계획구역
         district_plan_names = []
         res_dp = self._query_feature("LT_C_UPISUQ161", geom_filter)
         is_district_plan = False
@@ -196,7 +209,6 @@ class VWorldClient:
                 if uname and uname not in district_plan_names:
                     district_plan_names.append(uname)
 
-        # 3. 용도지구 (경관지구, 고도지구, 방화지구 등)
         overlay_zones = []
         for l in ["LT_C_UPISUQ151", "LT_C_UQ121", "LT_C_UQ123", "LT_C_UQ124", "LT_C_UQ126", "LT_C_UQ128"]:
             res_oz = self._query_feature(l, geom_filter)
@@ -206,7 +218,6 @@ class VWorldClient:
                     if uname and uname not in overlay_zones:
                         overlay_zones.append(uname)
 
-        # 4. 기타 규제구역 (토지거래허가구역, 개발행위허가제한 등)
         restrictions = []
         for l in ["LT_C_UQ141", "LT_C_UPISUQ171"]:
             res_r = self._query_feature(l, geom_filter)
@@ -228,7 +239,6 @@ class VWorldClient:
         }
 
     def get_official_cadastral_info(self, pnu: str) -> Dict[str, Any]:
-        """PNU를 기반으로 토지특성 및 토지대장 공부상 대지면적, 지목 등 조회"""
         if not pnu or len(pnu) < 10:
             return {"has_cadastral": False}
 
