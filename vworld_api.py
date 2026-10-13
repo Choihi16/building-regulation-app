@@ -21,7 +21,9 @@ class VWorldClient:
     def _get_headers(self) -> Dict[str, str]:
         return {
             "Referer": f"https://{self.domain}",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7"
         }
 
     def geocode(self, address: str) -> Dict[str, Any]:
@@ -67,68 +69,79 @@ class VWorldClient:
             "category": "parcel",
             "format": "json",
             "key": self.api_key
-            # 검색 API는 domain 파라미터를 지원하지 않으므로 제거함
         }
-        try:
-            resp = requests.get(self.search_url, params=params, headers=headers, timeout=8)
-            
-            # 응답이 JSON 형식인지 먼저 텍스트로 안전하게 체크
+        
+        # 세션(Session)을 활용하여 방화벽의 단발성 커넥션 차단(RemoteDisconnected) 우회
+        session = requests.Session()
+        session.headers.update(headers)
+        
+        for attempt in range(2): # 최대 2회 재시도
             try:
-                data = resp.json()
-            except json.JSONDecodeError:
-                return {
-                    "success": False,
-                    "raw_address": query,
-                    "error": f"API 응답 형식 오류 (HTML 수신됨): {resp.text[:100]}"
-                }
-
-            status = data.get("response", {}).get("status")
-            if status == "OK":
-                items = data.get("response", {}).get("result", {}).get("items", [])
-                if items:
-                    it = items[0]
-                    addr = it.get("address", {})
-                    pt = it.get("point", {})
-                    pnu = it.get("id", "")
-                    parcel_txt = addr.get("parcel", "")
-                    tokens = parcel_txt.split()
-                    sido = tokens[0] if len(tokens) > 0 else ""
-                    sigg = tokens[1] if len(tokens) > 1 else ""
-                    emd = tokens[2] if len(tokens) > 2 else ""
-
-                    return {
-                        "success": True,
-                        "raw_address": query,
-                        "refined_address": parcel_txt or addr.get("road", query),
-                        "pnu": pnu,
-                        "x": float(pt.get("x", 0.0)),
-                        "y": float(pt.get("y", 0.0)),
-                        "sido": sido,
-                        "sigg": sigg,
-                        "emd": emd,
-                        "detail_jibun": "",
-                        "zipcode": addr.get("zipcode", "")
-                    }
-                else:
+                resp = session.get(self.search_url, params=params, timeout=10)
+                
+                try:
+                    data = resp.json()
+                except json.JSONDecodeError:
                     return {
                         "success": False,
                         "raw_address": query,
-                        "error": "검색 결과가 없습니다."
+                        "error": f"API 응답 형식 오류 (HTML 수신됨): {resp.text[:100]}"
                     }
-            else:
-                err_info = data.get("response", {}).get("error", {})
-                err_text = err_info.get("text") or str(data)
-                return {
-                    "success": False,
-                    "raw_address": query,
-                    "error": f"V-World 거부 [Status: {status}] - {err_text}"
-                }
-        except Exception as e:
-            return {
-                "success": False,
-                "raw_address": query,
-                "error": f"통신 예외 발생: {str(e)}"
-            }
+
+                status = data.get("response", {}).get("status")
+                if status == "OK":
+                    items = data.get("response", {}).get("result", {}).get("items", [])
+                    if items:
+                        it = items[0]
+                        addr = it.get("address", {})
+                        pt = it.get("point", {})
+                        pnu = it.get("id", "")
+                        parcel_txt = addr.get("parcel", "")
+                        tokens = parcel_txt.split()
+                        sido = tokens[0] if len(tokens) > 0 else ""
+                        sigg = tokens[1] if len(tokens) > 1 else ""
+                        emd = tokens[2] if len(tokens) > 2 else ""
+
+                        return {
+                            "success": True,
+                            "raw_address": query,
+                            "refined_address": parcel_txt or addr.get("road", query),
+                            "pnu": pnu,
+                            "x": float(pt.get("x", 0.0)),
+                            "y": float(pt.get("y", 0.0)),
+                            "sido": sido,
+                            "sigg": sigg,
+                            "emd": emd,
+                            "detail_jibun": "",
+                            "zipcode": addr.get("zipcode", "")
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "raw_address": query,
+                            "error": "검색 결과가 없습니다."
+                        }
+                else:
+                    err_info = data.get("response", {}).get("error", {})
+                    err_text = err_info.get("text") or str(data)
+                    return {
+                        "success": False,
+                        "raw_address": query,
+                        "error": f"V-World 거부 [Status: {status}] - {err_text}"
+                    }
+            except Exception as e:
+                if attempt == 1:
+                    return {
+                        "success": False,
+                        "raw_address": query,
+                        "error": f"통신 예외 발생: {str(e)}"
+                    }
+
+        return {
+            "success": False,
+            "raw_address": query,
+            "error": "통신 시도가 모두 실패했습니다."
+        }
 
     def get_land_use_and_restrictions(self, x: float, y: float) -> Dict[str, Any]:
         geom_filter = f"POINT({x} {y})"
@@ -195,8 +208,10 @@ class VWorldClient:
             "format": "json",
             "numOfRows": 1
         }
+        session = requests.Session()
+        session.headers.update(headers)
         try:
-            resp = requests.get(url, params=params, headers=headers, timeout=6)
+            resp = session.get(url, params=params, timeout=6)
             data = resp.json()
             fields = data.get("landCharacteristicss", {}).get("field", [])
             if fields:
@@ -238,8 +253,10 @@ class VWorldClient:
             "crs": "EPSG:4326",
             "format": "json"
         }
+        session = requests.Session()
+        session.headers.update(headers)
         try:
-            resp = requests.get(self.data_url, params=params, headers=headers, timeout=6)
+            resp = session.get(self.data_url, params=params, timeout=6)
             data = resp.json()
             if data.get("response", {}).get("status") == "OK":
                 return data.get("response", {}).get("result", {}).get("featureCollection", {}).get("features", [])
