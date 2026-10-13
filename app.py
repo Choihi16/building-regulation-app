@@ -1150,31 +1150,18 @@ if trigger_analysis or "exec_analysis" in st.session_state:
         
         df_delib = pd.DataFrame(delib_rows)
         
-        # 1. HTML 테이블 문자열 생성
-        html_table = df_delib.to_html(escape=False, index=False, classes="custom-table")
-        
-        # 2. CSS 스타일 정의 (대상 여부 칸이 줄바꿈되지 않도록 강제 고정)
-        custom_css = """
+        # 1. 스타일(CSS)을 먼저 안전하게 적용
+        st.markdown("""
         <style>
-            .custom-table {
-                width: 100%;
-                border-collapse: collapse;
-            }
-            .custom-table th, .custom-table td {
-                padding: 8px 12px;
-                text-align: center;
-            }
-            /* '대상 여부' 컬럼(두 번째 열)이 절대 줄바꿈되지 않도록 설정 */
-            .custom-table th:nth-child(2), .custom-table td:nth-child(2) {
-                white-space: nowrap !important;
-                width: 100px; 
-            }
+            .custom-table { width: 100%; border-collapse: collapse; }
+            .custom-table th, .custom-table td { padding: 8px 12px; text-align: center; }
+            .custom-table th:nth-child(2), .custom-table td:nth-child(2) { white-space: nowrap !important; width: 100px; }
         </style>
-        """
+        """, unsafe_allow_html=True)
         
-        # 3. CSS와 HTML 테이블을 합쳐서 단 한 번만 안전하게 렌더링
-        st.markdown(custom_css + html_table, unsafe_allow_html=True)
-
+        # 2. HTML 표를 깔끔하게 출력
+        st.markdown(df_delib.to_html(escape=False, index=False, classes="custom-table"), unsafe_allow_html=True)
+        
         st.write("")
         st.markdown('<div class="section-title">🌍 4대 영향평가 (환경/교육/지하/문화재) 추가 진단</div>', unsafe_allow_html=True)
         
