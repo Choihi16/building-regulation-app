@@ -37,7 +37,8 @@ class VWorldClient:
             "simple": "false",
             "format": "json",
             "type": "PARCEL",
-            "key": self.api_key
+            "key": self.api_key,
+            "domain": self.domain  # <-- 추가됨
         }
         try:
             resp = requests.get(self.geocode_url, params=params, headers=headers, timeout=8)
@@ -103,7 +104,8 @@ class VWorldClient:
             "type": "address",
             "category": "parcel",
             "format": "json",
-            "key": self.api_key
+            "key": self.api_key,
+            "domain": self.domain  # <-- 추가됨
         }
         try:
             resp = requests.get(self.search_url, params=params, headers=headers, timeout=8)
