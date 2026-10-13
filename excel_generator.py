@@ -15,22 +15,23 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-# 스타일 상수 정의
-FONT_TITLE = Font(name="맑은 고딕", size=15, bold=True, color="1E3A8A")
-FONT_SECTION = Font(name="맑은 고딕", size=11, bold=True, color="0F172A")
+# 스타일 상수 정의 (모던 진한 회색 및 차콜 그레이 비즈니스 톤)
+FONT_TITLE = Font(name="맑은 고딕", size=15, bold=True, color="222222")
+FONT_SECTION = Font(name="맑은 고딕", size=11, bold=True, color="333333")
 FONT_HEADER = Font(name="맑은 고딕", size=9.5, bold=True, color="FFFFFF")
-FONT_REGULAR = Font(name="맑은 고딕", size=9, color="1E293B")
-FONT_BOLD = Font(name="맑은 고딕", size=9, bold=True, color="0F172A")
-FONT_MUTED = Font(name="맑은 고딕", size=8.5, color="64748B")
+FONT_REGULAR = Font(name="맑은 고딕", size=9, color="333333")
+FONT_BOLD = Font(name="맑은 고딕", size=9, bold=True, color="222222")
+FONT_MUTED = Font(name="맑은 고딕", size=8.5, color="666666")
 
-FILL_NAVY_HEADER = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
-FILL_BLUE_HEADER = PatternFill(start_color="2563EB", end_color="2563EB", fill_type="solid")
-FILL_SLATE_HEADER = PatternFill(start_color="475569", end_color="475569", fill_type="solid")
-FILL_LIGHT_BLUE = PatternFill(start_color="EFF6FF", end_color="EFF6FF", fill_type="solid")
-FILL_LIGHT_GRAY = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
-FILL_LIGHT_GREEN = PatternFill(start_color="DEF7EC", end_color="DEF7EC", fill_type="solid")
-FILL_LIGHT_YELLOW = PatternFill(start_color="FEF08A", end_color="FEF08A", fill_type="solid")
-FILL_LIGHT_RED = PatternFill(start_color="FDE8E8", end_color="FDE8E8", fill_type="solid")
+# 채우기 색상 (파란색 계열 제거 -> 진한 회색/차콜 및 연한 회색 조합)
+FILL_NAVY_HEADER = PatternFill(start_color="333333", end_color="333333", fill_type="solid")  # 메인 제목/상단 바 (진한 차콜)
+FILL_BLUE_HEADER = PatternFill(start_color="4F4F4F", end_color="4F4F4F", fill_type="solid")  # 중간 헤더 (중간 회색)
+FILL_SLATE_HEADER = PatternFill(start_color="7F7F7F", end_color="7F7F7F", fill_type="solid") # 보조 헤더 (밝은 회색 톤)
+FILL_LIGHT_BLUE = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")  # 포인트 박스 배경 (연한 회색)
+FILL_LIGHT_GRAY = PatternFill(start_color="FAFAFA", end_color="FAFAFA", fill_type="solid")  # 줄무늬 배경 (아주 연한 회색)
+FILL_LIGHT_GREEN = PatternFill(start_color="EAEAEA", end_color="EAEAEA", fill_type="solid") # 성공/안전 강조 톤
+FILL_LIGHT_YELLOW = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")# 주의/경고 강조 톤
+FILL_LIGHT_RED = PatternFill(start_color="EFEFEF", end_color="EFEFEF", fill_type="solid")   # 규제/위험 강조 톤
 
 BORDER_THIN = Border(
     left=Side(style="thin", color="CBD5E1"),
