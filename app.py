@@ -813,39 +813,35 @@ if trigger_analysis or "exec_analysis" in st.session_state:
     # ---------------------------------------------------------
     k1, k2, k3, k4 = st.columns(4)
     
-    # 공통으로 쓰일 우측 하단 링크 아이콘 스타일 및 태그
-    # (새 창으로 안전하게 열리도록 target="_blank"를 넣었습니다)
-    eum_icon_html = '<a href="https://www.eum.go.kr/web/am/amMain.jsp" target="_blank" style="position: absolute; right: 12px; bottom: 10px; text-decoration: none; font-size: 15px; opacity: 0.7;" title="토지이음에서 상세 확인">🔍</a>'
+    # 4번 카드 오른쪽 '하단' 바깥쪽에 띄울 토지이음 링크 아이콘 스타일
+    eum_outside_icon_html = '<a href="https://www.eum.go.kr/web/am/amMain.jsp" target="_blank" style="position: absolute; right: -25px; bottom: 10px; text-decoration: none; font-size: 18px; z-index: 10;" title="토지이음에서 상세 확인">🔍</a>'
 
     with k1:
         st.markdown(f"""
-        <div class="metric-box green" style="position: relative; min-height: 120px;">
+        <div class="metric-box green" style="min-height: 120px;">
             <div class="metric-header">① 적용 건폐율 (BCR)</div>
             <div class="metric-value-lg">{bcr.get('applied_limit')} <span style="font-size:0.85rem; color:#64748B; font-weight:600;">(적용 기준)</span></div>
             <div style="font-size:0.75rem; color:#059669; margin-top:4px; font-weight:700; line-height:1.4;">{bcr.get('comparison_summary')}</div>
             <div class="metric-footnote">최대 건축면적: <b>{feas['max_building_area_sqm']:,.0f}㎡ ({feas['max_building_area_py']:,.0f}평)</b></div>
-            {eum_icon_html}
         </div>
         """, unsafe_allow_html=True)
 
     with k2:
         st.markdown(f"""
-        <div class="metric-box purple" style="position: relative; min-height: 120px;">
+        <div class="metric-box purple" style="min-height: 120px;">
             <div class="metric-header">② 적용 용적률 (FAR)</div>
             <div class="metric-value-lg">{far.get('applied_limit')} <span style="font-size:0.85rem; color:#64748B; font-weight:600;">(엄격 기준 적용)</span></div>
             <div style="font-size:0.75rem; color:#7C3AED; margin-top:4px; font-weight:700; line-height:1.4;">{far.get('comparison_summary')}</div>
             <div class="metric-footnote">지상 연면적: <b>{feas['max_ground_gfa_sqm']:,.0f}㎡ ({feas['max_ground_gfa_py']:,.0f}평)</b></div>
-            {eum_icon_html}
         </div>
         """, unsafe_allow_html=True)
 
     with k3:
         st.markdown(f"""
-        <div class="metric-box orange" style="position: relative; min-height: 120px;">
+        <div class="metric-box orange" style="min-height: 120px;">
             <div class="metric-header">③ 예상 최고높이 / 층수</div>
             <div class="metric-value-lg">지상 {feas['est_floors']}층 <span style="font-size:1.1rem; color:#64748B;">({feas['est_height_m']}m)</span></div>
             <div class="metric-footnote">층고 가정: <b>층당 {feas['floor_height_m']}m</b> / 일조사선 셋백</div>
-            {eum_icon_html}
         </div>
         """, unsafe_allow_html=True)
 
@@ -859,7 +855,7 @@ if trigger_analysis or "exec_analysis" in st.session_state:
                 {risk_sum['high_risk_count']}개 대상
             </div>
             <div class="metric-footnote">인허가 소요: <b>{risk_sum['total_timeline_est']}</b></div>
-            {eum_icon_html}
+            {eum_outside_icon_html}
         </div>
         """, unsafe_allow_html=True)
 
