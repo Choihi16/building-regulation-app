@@ -1,7 +1,5 @@
 """
-V-World API 클라이언트 모듈
-- 지오코딩 (주소 -> 좌표, PNU, 행정구역 추출)
-- 데이터 API (용도지역, 용도지구, 지구단위계획구역 등 연속주제도 조회)
+V-World API 클라이언트 모듈 (디버그 모드)
 """
 
 import requests
@@ -22,7 +20,7 @@ class VWorldClient:
         return {
             "Referer": f"https://{self.domain}",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Accept": "application/json, text/plain, */*",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
             "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7"
         }
 
@@ -71,77 +69,76 @@ class VWorldClient:
             "key": self.api_key
         }
         
-        # 세션(Session)을 활용하여 방화벽의 단발성 커넥션 차단(RemoteDisconnected) 우회
         session = requests.Session()
         session.headers.update(headers)
         
-        for attempt in range(2): # 최대 2회 재시도
+        try:
+            resp = session.get(self.search_url, params=params, timeout=10)
+            
+            # 응답 상태 코드 및 내용 확인
+            if resp.status_code != 200:
+                return {
+                    "success": False,
+                    "raw_address": query,
+                    "error": f"서버 응답 코드 비정상 [{resp.status_code}]: {resp.text[:200]}"
+                }
+
             try:
-                resp = session.get(self.search_url, params=params, timeout=10)
-                
-                try:
-                    data = resp.json()
-                except json.JSONDecodeError:
+                data = resp.json()
+            except json.JSONDecodeError:
+                return {
+                    "success": False,
+                    "raw_address": query,
+                    "error": f"브이월드 방화벽 차단(HTML 반환됨): {resp.text[:200]}"
+                }
+
+            status = data.get("response", {}).get("status")
+            if status == "OK":
+                items = data.get("response", {}).get("result", {}).get("items", [])
+                if items:
+                    it = items[0]
+                    addr = it.get("address", {})
+                    pt = it.get("point", {})
+                    pnu = it.get("id", "")
+                    parcel_txt = addr.get("parcel", "")
+                    tokens = parcel_txt.split()
+                    sido = tokens[0] if len(tokens) > 0 else ""
+                    sigg = tokens[1] if len(tokens) > 1 else ""
+                    emd = tokens[2] if len(tokens) > 2 else ""
+
                     return {
-                        "success": False,
+                        "success": True,
                         "raw_address": query,
-                        "error": f"API 응답 형식 오류 (HTML 수신됨): {resp.text[:100]}"
+                        "refined_address": parcel_txt or addr.get("road", query),
+                        "pnu": pnu,
+                        "x": float(pt.get("x", 0.0)),
+                        "y": float(pt.get("y", 0.0)),
+                        "sido": sido,
+                        "sigg": sigg,
+                        "emd": emd,
+                        "detail_jibun": "",
+                        "zipcode": addr.get("zipcode", "")
                     }
-
-                status = data.get("response", {}).get("status")
-                if status == "OK":
-                    items = data.get("response", {}).get("result", {}).get("items", [])
-                    if items:
-                        it = items[0]
-                        addr = it.get("address", {})
-                        pt = it.get("point", {})
-                        pnu = it.get("id", "")
-                        parcel_txt = addr.get("parcel", "")
-                        tokens = parcel_txt.split()
-                        sido = tokens[0] if len(tokens) > 0 else ""
-                        sigg = tokens[1] if len(tokens) > 1 else ""
-                        emd = tokens[2] if len(tokens) > 2 else ""
-
-                        return {
-                            "success": True,
-                            "raw_address": query,
-                            "refined_address": parcel_txt or addr.get("road", query),
-                            "pnu": pnu,
-                            "x": float(pt.get("x", 0.0)),
-                            "y": float(pt.get("y", 0.0)),
-                            "sido": sido,
-                            "sigg": sigg,
-                            "emd": emd,
-                            "detail_jibun": "",
-                            "zipcode": addr.get("zipcode", "")
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "raw_address": query,
-                            "error": "검색 결과가 없습니다."
-                        }
                 else:
-                    err_info = data.get("response", {}).get("error", {})
-                    err_text = err_info.get("text") or str(data)
                     return {
                         "success": False,
                         "raw_address": query,
-                        "error": f"V-World 거부 [Status: {status}] - {err_text}"
+                        "error": "검색 결과 아이템이 없습니다."
                     }
-            except Exception as e:
-                if attempt == 1:
-                    return {
-                        "success": False,
-                        "raw_address": query,
-                        "error": f"통신 예외 발생: {str(e)}"
-                    }
-
-        return {
-            "success": False,
-            "raw_address": query,
-            "error": "통신 시도가 모두 실패했습니다."
-        }
+            else:
+                err_info = data.get("response", {}).get("error", {})
+                err_text = err_info.get("text") or str(data)
+                return {
+                    "success": False,
+                    "raw_address": query,
+                    "error": f"V-World 거부 [Status: {status}] - {err_text}"
+                }
+        except Exception as e:
+            return {
+                "success": False,
+                "raw_address": query,
+                "error": f"통신 예외 발생: {str(e)}"
+            }
 
     def get_land_use_and_restrictions(self, x: float, y: float) -> Dict[str, Any]:
         geom_filter = f"POINT({x} {y})"
