@@ -1,5 +1,5 @@
 """
-행정안전부 주소정보 API 및 V-World 연동 클라이언트 모듈 (비공식 행정구역명 자동 교정 강화)
+행정안전부 주소정보 API 및 V-World 연동 클라이언트 모듈 (전국 17개 시·도 매칭 딕셔너리 완전 통합 버전)
 """
 
 import requests
@@ -23,15 +23,17 @@ class VWorldClient:
         }
 
     def _clean_address(self, address: str) -> str:
-        """주소 입력값 자동 클렌징 및 비공식 행정구역명(제물포구 등) 교정"""
+        """주소 입력값 클렌징 및 비공식/가칭 행정구역(제물포구 등) 및 전국 시·도 자동 보정 완벽 통합"""
         address = address.strip()
         address = re.sub(r'번지', '', address).strip()
         address = re.sub(r'\s+', ' ', address)
 
-        # 🌟 핵심: 지도나 민간에서 쓰이는 비공식/가칭 행정구역명을 공식 명칭으로 자동 교정
+        # 비공식/가칭 명칭 정규화
         address = address.replace("제물포구", "중구")
+        address = address.replace("인천광역시 제물포구", "인천광역시 중구")
+        address = address.replace("인천시 제물포구", "인천광역시 중구")
 
-        # 전국 단위 주요 동/지역명에 따른 시·도·구 자동 매칭 딕셔너리
+        # 전국 단위 주요 동/지역명에 따른 시·도·구 자동 매칭 딕셔너리 (충청, 전라, 경상, 수도권 등 전체 포함)
         auto_sido_mapping = {
             # 인천 지역 세부 보정
             "신흥동3가": "인천광역시 중구 ",
@@ -82,7 +84,7 @@ class VWorldClient:
                     address = prefix + address
                     break
 
-        # 표준 시·도 축약어 정규화
+        # 표준 시·도 축약어 및 명칭 정규화
         sido_mapping = {
             "서울시 ": "서울특별시 ", "서울 ": "서울특별시 ",
             "부산시 ": "부산광역시 ", "부산 ": "부산광역시 ",
@@ -111,51 +113,62 @@ class VWorldClient:
         return address
 
     def search_address_candidates(self, keyword: str) -> List[Dict[str, Any]]:
-        """입력 키워드에 연관된 전국 주소 후보 목록 반환"""
+        """입력 키워드에 연관된 전국 주소 후보 목록 반환 (다중 폴백 검색)"""
         if not keyword or len(keyword.strip()) < 2:
             return []
 
         cleaned_kw = self._clean_address(keyword)
+        
+        # 1차 검색: 정제된 전체 키워드
+        juso_list = self._call_mois_api(cleaned_kw)
+        
+        # 2차 검색: 결과가 없고 상세 번지가 포함된 경우 번지 제거 후 동 이름 위주 검색
+        if not juso_list:
+            base_kw = re.sub(r'\s+\d+(?:-\d+)?$', '', cleaned_kw)
+            if base_kw != cleaned_kw:
+                juso_list = self._call_mois_api(base_kw)
+
+        candidates = []
+        for item in juso_list:
+            road_addr = item.get("roadAddr", "")
+            jibun_addr = item.get("jibunAddr", "")
+            adm_cd = item.get("admCd", "")
+
+            jibun_tokens = jibun_addr.split()
+            sido = jibun_tokens[0] if len(jibun_tokens) > 0 else ""
+            sigg = jibun_tokens[1] if len(jibun_tokens) > 1 else ""
+            emd = jibun_tokens[2] if len(jibun_tokens) > 2 else ""
+
+            ln_mn = str(item.get("lnMnnm", "0")).zfill(4)
+            ln_sl = str(item.get("lnSlno", "0")).zfill(4)
+            san_yn = "2" if "산" in jibun_addr else "1"
+            pnu = f"{adm_cd}{san_yn}{ln_mn}{ln_sl}" if len(adm_cd) == 10 else ""
+
+            candidates.append({
+                "refined_address": jibun_addr or road_addr,
+                "road_address": road_addr,
+                "jibun_address": jibun_addr,
+                "pnu": pnu,
+                "sido": sido,
+                "sigg": sigg,
+                "emd": emd,
+                "zipcode": item.get("zipNo", "")
+            })
+        return candidates
+
+    def _call_mois_api(self, keyword: str) -> list:
+        """행정안전부 주소 API 실제 호출 메서드"""
         params = {
             "confmKey": self.api_key,
             "currentPage": "1",
-            "countPerPage": "10",
-            "keyword": cleaned_kw,
+            "countPerPage": "15",
+            "keyword": keyword,
             "resultType": "json"
         }
-
         try:
             resp = requests.get(self.addr_api_url, params=params, timeout=6)
             data = resp.json()
-            juso_list = data.get("results", {}).get("juso", [])
-
-            candidates = []
-            for item in juso_list:
-                road_addr = item.get("roadAddr", "")
-                jibun_addr = item.get("jibunAddr", "")
-                adm_cd = item.get("admCd", "")
-
-                jibun_tokens = jibun_addr.split()
-                sido = jibun_tokens[0] if len(jibun_tokens) > 0 else ""
-                sigg = jibun_tokens[1] if len(jibun_tokens) > 1 else ""
-                emd = jibun_tokens[2] if len(jibun_tokens) > 2 else ""
-
-                ln_mn = str(item.get("lnMnnm", "0")).zfill(4)
-                ln_sl = str(item.get("lnSlno", "0")).zfill(4)
-                san_yn = "2" if "산" in jibun_addr else "1"
-                pnu = f"{adm_cd}{san_yn}{ln_mn}{ln_sl}" if len(adm_cd) == 10 else ""
-
-                candidates.append({
-                    "refined_address": jibun_addr or road_addr,
-                    "road_address": road_addr,
-                    "jibun_address": jibun_addr,
-                    "pnu": pnu,
-                    "sido": sido,
-                    "sigg": sigg,
-                    "emd": emd,
-                    "zipcode": item.get("zipNo", "")
-                })
-            return candidates
+            return data.get("results", {}).get("juso", [])
         except Exception:
             return []
 
@@ -169,21 +182,29 @@ class VWorldClient:
                 "error": "검색된 주소가 없습니다. 정확한 지번이나 도로명으로 입력해 주세요."
             }
 
-        item = candidates[0]
-        x, y = self._get_coords_from_vworld(item["refined_address"])
+        target_item = candidates[0]
+        match_num = re.search(r'(\d+)(?:-(\d+))?', address)
+        if match_num:
+            search_str = match_num.group(0)
+            for c in candidates:
+                if search_str in c["refined_address"]:
+                    target_item = c
+                    break
+
+        x, y = self._get_coords_from_vworld(target_item["refined_address"])
 
         return {
             "success": True,
             "raw_address": address,
-            "refined_address": item["refined_address"],
-            "pnu": item["pnu"],
+            "refined_address": target_item["refined_address"],
+            "pnu": target_item["pnu"],
             "x": x,
             "y": y,
-            "sido": item["sido"],
-            "sigg": item["sigg"],
-            "emd": item["emd"],
+            "sido": target_item["sido"],
+            "sigg": target_item["sigg"],
+            "emd": target_item["emd"],
             "detail_jibun": "",
-            "zipcode": item["zipcode"]
+            "zipcode": target_item["zipcode"]
         }
 
     def _get_coords_from_vworld(self, query: str) -> tuple:
