@@ -22,7 +22,7 @@ class VWorldClient:
         return {"Referer": f"https://{self.domain}"}
 
     def geocode(self, address: str) -> Dict[str, Any]:
-        """주소를 검색하여 좌표, PNU, 정제주소, 행정구역 체계를 반환 (검색 API 우선 활용)"""
+        """주소를 검색하여 좌표, PNU, 정제주소, 행정구역 체계를 반환"""
         address = address.strip()
         
         # 전국 시·도 축약어 자동 정규화
@@ -48,16 +48,7 @@ class VWorldClient:
                 address = address.replace(short_name, full_name, 1)
                 break
 
-        # 안정적인 검색 API(search_fallback)를 먼저 실행하여 오류 원천 차단
-        result = self._search_fallback(address)
-        if result.get("success"):
-            return result
-
-        return {
-            "success": False,
-            "raw_address": address,
-            "error": "주소를 찾을 수 없습니다. 도로명 또는 지번 주소를 확인해주세요."
-        }
+        return self._search_fallback(address)
 
     def _search_fallback(self, query: str) -> Dict[str, Any]:
         headers = self._get_headers()
@@ -78,7 +69,9 @@ class VWorldClient:
         try:
             resp = requests.get(self.search_url, params=params, headers=headers, timeout=8)
             data = resp.json()
-            if data.get("response", {}).get("status") == "OK":
+            status = data.get("response", {}).get("status")
+            
+            if status == "OK":
                 items = data.get("response", {}).get("result", {}).get("items", [])
                 if items:
                     it = items[0]
@@ -104,14 +97,27 @@ class VWorldClient:
                         "detail_jibun": "",
                         "zipcode": addr.get("zipcode", "")
                     }
+                else:
+                    return {
+                        "success": False,
+                        "raw_address": query,
+                        "error": "검색 결과 아이템이 없습니다 (주소 불일치 가능성)"
+                    }
+            else:
+                # 브이월드 서버가 거부한 구체적인 이유 추출
+                err_info = data.get("response", {}).get("error", {})
+                err_text = err_info.get("text") or str(data)
+                return {
+                    "success": False,
+                    "raw_address": query,
+                    "error": f"V-World 거부 [Status: {status}] - {err_text}"
+                }
         except Exception as e:
-            pass
-
-        return {
-            "success": False,
-            "raw_address": query,
-            "error": "검색 API 실패"
-        }
+            return {
+                "success": False,
+                "raw_address": query,
+                "error": f"통신 예외 발생: {str(e)}"
+            }
 
     def get_land_use_and_restrictions(self, x: float, y: float) -> Dict[str, Any]:
         geom_filter = f"POINT({x} {y})"
