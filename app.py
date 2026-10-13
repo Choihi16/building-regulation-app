@@ -1155,7 +1155,13 @@ if trigger_analysis or "exec_analysis" in st.session_state:
         <style>
             .custom-table { width: 100%; border-collapse: collapse; }
             .custom-table th, .custom-table td { padding: 8px 12px; text-align: center; }
-            .custom-table th:nth-child(2), .custom-table td:nth-child(2) { white-space: nowrap !important; width: 100px; }
+            
+            /* '대상 여부'(2번째)와 '리스크 등급'(3번째) 컬럼이 절대 줄바꿈되지 않도록 설정 */
+            .custom-table th:nth-child(2), .custom-table td:nth-child(2),
+            .custom-table th:nth-child(3), .custom-table td:nth-child(3) { 
+                white-space: nowrap !important; 
+                width: 90px; 
+            }
         </style>
         """, unsafe_allow_html=True)
         
