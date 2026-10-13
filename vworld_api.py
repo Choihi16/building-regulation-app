@@ -22,7 +22,7 @@ class VWorldClient:
         return {"Referer": f"https://{self.domain}"}
 
     def geocode(self, address: str) -> Dict[str, Any]:
-        """주소를 지오코딩하여 좌표, PNU, 정제주소, 행정구역 체계를 반환"""
+        """주소를 검색하여 좌표, PNU, 정제주소, 행정구역 체계를 반환 (검색 API 우선 활용)"""
         address = address.strip()
         
         # 전국 시·도 축약어 자동 정규화
@@ -48,88 +48,15 @@ class VWorldClient:
                 address = address.replace(short_name, full_name, 1)
                 break
 
-        headers = self._get_headers()
-        last_error = ""
+        # 안정적인 검색 API(search_fallback)를 먼저 실행하여 오류 원천 차단
+        result = self._search_fallback(address)
+        if result.get("success"):
+            return result
 
-        # 1차 시도: PARCEL (지번)
-        params = {
-            "service": "address",
-            "request": "getcoord",
-            "version": "2.0",
-            "crs": "epsg:4326",
-            "address": address,
-            "refine": "true",
-            "simple": "false",
-            "format": "json",
-            "type": "PARCEL",
-            "key": self.api_key,
-            "domain": self.domain
-        }
-        try:
-            resp = requests.get(self.geocode_url, params=params, headers=headers, timeout=8)
-            data = resp.json()
-            status = data.get("response", {}).get("status")
-            if status == "OK":
-                return self._parse_geocode_result(data, address)
-            else:
-                err_msg = data.get("response", {}).get("error", {}).get("text", str(data))
-                last_error = f"PARCEL 실패: {status} ({err_msg})"
-        except Exception as e:
-            last_error = f"PARCEL 예외: {str(e)}"
-
-        # 2차 시도: ROAD (도로명)
-        params["type"] = "ROAD"
-        try:
-            resp = requests.get(self.geocode_url, params=params, headers=headers, timeout=8)
-            data = resp.json()
-            status = data.get("response", {}).get("status")
-            if status == "OK":
-                return self._parse_geocode_result(data, address)
-            else:
-                err_msg = data.get("response", {}).get("error", {}).get("text", str(data))
-                last_error = f"ROAD 실패: {status} ({err_msg})"
-        except Exception as e:
-            last_error = f"ROAD 예외: {str(e)}"
-
-        # 3차 시도: Search API 2.0
-        search_result = self._search_fallback(address)
-        if search_result.get("success"):
-            return search_result
-        
-        # 모든 시도 실패 시 상세 원인 반환
         return {
             "success": False,
             "raw_address": address,
-            "error": f"주소 확인 실패 [{last_error}]"
-        }
-
-    def _parse_geocode_result(self, data: Dict[str, Any], raw_addr: str) -> Dict[str, Any]:
-        resp_data = data.get("response", {})
-        refined = resp_data.get("refined", {})
-        structure = refined.get("structure", {})
-        point = resp_data.get("result", {}).get("point", {})
-
-        x = float(point.get("x", 0.0))
-        y = float(point.get("y", 0.0))
-        pnu = structure.get("level4LC") or ""
-
-        if not pnu or len(pnu) < 19:
-            search_res = self._search_fallback(refined.get("text", raw_addr))
-            if search_res.get("pnu"):
-                pnu = search_res["pnu"]
-
-        return {
-            "success": True,
-            "raw_address": raw_addr,
-            "refined_address": refined.get("text") or raw_addr,
-            "pnu": pnu,
-            "x": x,
-            "y": y,
-            "sido": structure.get("level1", ""),
-            "sigg": structure.get("level2", ""),
-            "emd": structure.get("level4L", ""),
-            "detail_jibun": structure.get("level5", ""),
-            "zipcode": structure.get("zipcode", "")
+            "error": "주소를 찾을 수 없습니다. 도로명 또는 지번 주소를 확인해주세요."
         }
 
     def _search_fallback(self, query: str) -> Dict[str, Any]:
@@ -183,7 +110,7 @@ class VWorldClient:
         return {
             "success": False,
             "raw_address": query,
-            "error": "검색 API fallback 실패"
+            "error": "검색 API 실패"
         }
 
     def get_land_use_and_restrictions(self, x: float, y: float) -> Dict[str, Any]:
