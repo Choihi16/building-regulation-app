@@ -1149,6 +1149,28 @@ if trigger_analysis or "exec_analysis" in st.session_state:
             })
         
         df_delib = pd.DataFrame(delib_rows)
+        
+        # 💡 HTML 테이블에 CSS 스타일을 주어 "대상 여부" 칸이 줄바꿈되지 않도록 강제합니다.
+        html_table = df_delib.to_html(escape=False, index=False, classes="custom-table")
+        
+        custom_css = """
+        <style>
+            .custom-table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            .custom-table th, .custom-table td {
+                padding: 8px 12px;
+                text-align: center;
+            }
+            /* '대상 여부' 컬럼(두 번째 열)이 줄바꿈되지 않도록 설정 */
+            .custom-table th:nth-child(2), .custom-table td:nth-child(2) {
+                white-space: nowrap;
+                width: 90px; 
+            }
+        </style>
+        """
+        st.markdown(custom_css + html_table, unsafe_allow_html=True)
         st.write(df_delib.to_html(escape=False, index=False), unsafe_allow_html=True)
 
         st.write("")
@@ -1175,7 +1197,7 @@ if trigger_analysis or "exec_analysis" in st.session_state:
             if current_area >= 100000 or (isinstance(current_units, int) and current_units >= 1000):
                  st.error(f"🚨 대규모(연면적 10만㎡ 또는 21층 이상) 건축물이거나 반경 200m 내 학교가 있을 경우 **필수 대상**입니다. 관할 교육청 확인이 시급합니다.")
             else:
-                 st.info("💡 사업지 반경 200m 이내에 학교(예정지 포함)가 있어 **'교육환경보호구역'**에 속할 경우 심의 대상입니다. (토지이용계획확인원 확인 필요)")
+                 st.info("💡 사업지 반경 200m 이내에 학교(예정지 포함)가 있어 '교육환경보호구역'에 속할 경우 심의 대상입니다. (토지이용계획확인원 확인 필요)")
 
         with col_sim2:
             # 3. 지하안전평가
@@ -1250,7 +1272,7 @@ if trigger_analysis or "exec_analysis" in st.session_state:
     # 탭 5. 한 줄 사업성 / 리스크 체크리스트 (보고서용)
     # ---------------------------------------------------------
     with t5:
-        st.markdown('<div class="section-title">📊 임원진 보고용 사업성 개략 볼륨 및 건축 개요표</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">📊 사업성 개략 볼륨 및 건축 개요표</div>', unsafe_allow_html=True)
 
         vol_table = [
             {"사업성 지표": "대지 면적", "산출 면적 (㎡)": f"{site_area_sqm:,.1f} ㎡", "평형 환산 (평)": f"{site_area_py:,.1f} 평", "비고": "토지대장 검증 기준"},
