@@ -1,5 +1,5 @@
 """
-행정안전부 주소정보 조회 API 클라이언트 모듈
+행정안전부 주소정보 조회 API 클라이언트 모듈 (오타 수정본)
 - 지번 및 도로명 주소 통합 검색 -> PNU 및 행정구역 추출
 - 용도지역 및 대장 조회는 기존 V-World 데이터 API 연동 유지
 """
@@ -8,7 +8,7 @@ import requests
 import json
 from typing import Dict, Any, List, Optional
 
-# 발급받으신 공공데이터포털 인증키 적용
+# 발급받으신 공공데이터포털 인증키
 MOIS_API_KEY = "devU01TX0FVVEgyMDI2MTAxMzE0NTg0NTEyMDY4NDM="
 VWORLD_KEY = "9FF03DCA-70F5-41A0-AC8B-0EB520A612B0"
 
@@ -97,10 +97,10 @@ class VWorldClient:
             # PNU 생성 (시군구코드(5) + 읍면동리코드(5) + 산여부(1) + 본번(4) + 부번(4))
             ln_mn = str(item.get("lnMnnm", "0")).zfill(4)
             ln_sl = str(item.get("lnSlno", "0")).zfill(4)
-            산유무 = "2" if "산" in jibun_addr else "1"
-            pnu = f"{admCd}{산유무}{ln_mn}{ln_sl}" if len(admCd) == 10 else ""
+            san_yn = "2" if "산" in jibun_addr else "1"
+            pnu = f"{adm_cd}{san_yn}{ln_mn}{ln_sl}" if len(adm_cd) == 10 else ""
 
-            # 좌표 조회를 위해 V-World 검색 API 가볍게 연동 (필요시)
+            # 좌표 조회를 위해 V-World 검색 API 보조 연동
             x, y = self._get_coords_from_vworld(road_addr or jibun_addr)
 
             return {
