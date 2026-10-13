@@ -24,6 +24,30 @@ class VWorldClient:
     def geocode(self, address: str) -> Dict[str, Any]:
         """주소를 지오코딩하여 좌표, PNU, 정제주소, 행정구역 체계를 반환"""
         address = address.strip()
+        
+        # 전국 시·도 축약어 자동 정규화 (브이월드 API 필수 요구사항)
+        sido_mapping = {
+            "서울시 ": "서울특별시 ", "서울 ": "서울특별시 ",
+            "부산시 ": "부산광역시 ", "부산 ": "부산광역시 ",
+            "대구시 ": "대구광역시 ", "대구 ": "대구광역시 ",
+            "인천시 ": "인천광역시 ", "인천 ": "인천광역시 ",
+            "광주시 ": "광주광역시 ", "광주 ": "광주광역시 ",
+            "대전시 ": "대전광역시 ", "대전 ": "대전광역시 ",
+            "울산시 ": "울산광역시 ", "울산 ": "울산광역시 ",
+            "세종시 ": "세종특별자치시 ", "세종 ": "세종특별자치시 ",
+            "제주시 ": "제주특별자치도 ", "제주 ": "제주특별자치도 ",
+            "경기도 ": "경기도 ", "경기 ": "경기도 ",
+            "강원도 ": "강원특별자치도 ", "강원 ": "강원특별자치도 ",
+            "충북 ": "충청북도 ", "충남 ": "충청남도 ",
+            "전북 ": "전북특별자치도 ", "전남 ": "전라남도 ",
+            "경북 ": "경상북도 ", "경남 ": "경상남도 "
+        }
+        
+        for short_name, full_name in sido_mapping.items():
+            if address.startswith(short_name):
+                address = address.replace(short_name, full_name, 1)
+                break
+
         headers = self._get_headers()
         
         # 1차 시도: PARCEL (지번)
@@ -38,7 +62,7 @@ class VWorldClient:
             "format": "json",
             "type": "PARCEL",
             "key": self.api_key,
-            "domain": self.domain  # <-- 추가됨
+            "domain": self.domain
         }
         try:
             resp = requests.get(self.geocode_url, params=params, headers=headers, timeout=8)
@@ -105,7 +129,7 @@ class VWorldClient:
             "category": "parcel",
             "format": "json",
             "key": self.api_key,
-            "domain": self.domain  # <-- 추가됨
+            "domain": self.domain
         }
         try:
             resp = requests.get(self.search_url, params=params, headers=headers, timeout=8)
@@ -268,4 +292,3 @@ class VWorldClient:
         except Exception:
             pass
         return None
-    
