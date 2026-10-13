@@ -203,27 +203,13 @@ engine = RegulationEngine()
 # 세션 상태 초기값 설정
 # -------------------------------------------------------------
 if "target_addr" not in st.session_state:
-    st.session_state["target_addr"] = "서울시 성북구 길음동 1284"
+    st.session_state["target_addr"] = ""  # 👈 주소를 빈 칸으로 설정
 
 if "site_area_sqm_val" not in st.session_state:
-    st.session_state["site_area_sqm_val"] = 46111.5
+    st.session_state["site_area_sqm_val"] = 0.0  # 👈 면적을 0으로 설정
 
 if "cadastral_info" not in st.session_state:
-    # 최초 진입 시 기본 주소 토지대장 데이터 미리 로드
-    pnu_init = "1129013400112840000"
-    st.session_state["cadastral_info"] = vworld.get_official_cadastral_info(pnu_init)
-
-if "apt_types" not in st.session_state:
-    st.session_state["apt_types"] = [
-        {"area": 59.0, "count": 80},
-        {"area": 84.0, "count": 120}
-    ]
-
-if "off_types" not in st.session_state:
-    st.session_state["off_types"] = [
-        {"area": 29.0, "count": 30},
-        {"area": 59.0, "count": 40}
-    ]
+    st.session_state["cadastral_info"] = {}  # 👈 초기 정보를 빈 딕셔너리로 설정
 
 # -------------------------------------------------------------
 # 사이드바: 기획설계 조건 및 검토 조건 입력
