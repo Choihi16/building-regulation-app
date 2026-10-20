@@ -410,8 +410,16 @@ class RegulationEngine:
             is_bcr_overridden = True
 
         # 4. 더 엄격한(낮은) 기준 실질 적용 (Stricter Limit Applied)
-        applied_far_num = min(national_far_num, far_ordinance_num)
-        applied_bcr_num = min(national_bcr_num, bcr_ordinance_num)
+        # 💡 수정: 사용자가 직접 오버라이드한 경우 national_far_num과 비교하여 깎이지 않도록 보정
+        if is_far_overridden:
+            applied_far_num = far_ordinance_num
+        else:
+            applied_far_num = min(national_far_num, far_ordinance_num)
+
+        if is_bcr_overridden:
+            applied_bcr_num = bcr_ordinance_num
+        else:
+            applied_bcr_num = min(national_bcr_num, bcr_ordinance_num)
 
         applied_far_val = f"{applied_far_num:.0f}%"
         applied_bcr_val = f"{applied_bcr_num:.0f}%"
