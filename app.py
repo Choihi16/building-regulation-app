@@ -736,7 +736,7 @@ if trigger_analysis or "exec_analysis" in st.session_state:
             cadastral_info = vworld.get_official_cadastral_info(pnu)
             st.session_state["cadastral_info"] = cadastral_info
             
-            land_info = vworld.get_land_use_and_restrictions(x, y)
+            land_info = vworld_client.get_land_use_and_restrictions(x, y, pnu, address_text=refined_address)
             sido, sigg = site_info.get("sido", ""), site_info.get("sigg", "")
             ordin_bundle = moleg.get_municipal_ordinance_bundle(sido, sigg)
             
