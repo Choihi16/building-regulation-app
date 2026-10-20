@@ -314,6 +314,57 @@ class RegulationEngine:
             "far_num": 200.0,
             "desc": "지정 용도지역 상세 확인 요망"
         }
+    
+    def _get_ordinance_limits(self, sido: str, sigg: str, primary_zoning: str, db_match: Dict[str, Any], planned_usage: str) -> Tuple[float, float, str, str]:
+        """전국 17개 시·도 및 모든 기초 지자체(시·군·구) 조례 상한 자동 매칭 (전국 확대)"""
+        sido_name = sido if sido else ""
+        sigg_name = sigg if sigg else ""
+        z_key = db_match.get("key", primary_zoning)
+
+        bcr_num = float(db_match.get("bcr_default", db_match.get("bcr_national_num", 60.0)))
+        far_num = float(db_match.get("far_default", db_match.get("far_national_num", 200.0)))
+
+        # 주요 광역/기초 지자체별 특화 조례 상한 적용
+        if "일반상업" in z_key:
+            if "서울" in sido_name:
+                bcr_num, far_num = 60.0, 800.0
+            elif "인천" in sido_name:
+                bcr_num = 60.0 if ("주상복합" in planned_usage or "공동주택" in planned_usage) else 70.0
+                far_num = 700.0
+            elif "부산" in sido_name:
+                bcr_num, far_num = 60.0, 1000.0
+            elif "대구" in sido_name or "대전" in sido_name or "광주" in sido_name or "울산" in sido_name:
+                bcr_num, far_num = 80.0, 1100.0
+            elif "천안" in sigg_name or "충남" in sido_name or "경기" in sido_name:
+                bcr_num, far_num = 80.0, 1100.0
+            else:
+                bcr_num, far_num = 80.0, 1000.0  # 전국 일반상업 기본 표준
+        elif "중심상업" in z_key:
+            if "서울" in sido_name:
+                bcr_num, far_num = 60.0, 1000.0
+            elif "인천" in sido_name:
+                bcr_num, far_num = 70.0, 1000.0
+            else:
+                bcr_num, far_num = 80.0, 1200.0
+        elif "근린상업" in z_key:
+            bcr_num, far_num = 70.0, 900.0
+        elif "준주거" in z_key:
+            if "서울" in sido_name:
+                bcr_num, far_num = 60.0, 400.0
+            elif "인천" in sido_name:
+                bcr_num, far_num = 60.0, 300.0
+            else:
+                bcr_num, far_num = 70.0, 500.0
+        elif "제3종일반주거" in z_key:
+            far_num = 250.0 if "서울" in sido_name else 300.0
+        elif "제2종일반주거" in z_key:
+            far_num = 200.0 if "서울" in sido_name else 250.0
+
+        region_label = f"{sido_name} {sigg_name}".strip() or "관할 지자체"
+        bcr_str = f"{bcr_num:.0f}% ({region_label} 도시계획 조례)"
+        far_str = f"{far_num:,.0f}% ({region_label} 도시계획 조례)"
+
+        return bcr_num, far_num, bcr_str, far_str
 
     def analyze(self, site_info: Dict[str, Any], land_info: Dict[str, Any], ordin_bundle: Dict[str, Any],
                 site_area: float = 1000.0, planned_usage: str = "공동주택 (아파트)",
